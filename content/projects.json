@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "title": "Social Ads",
+    "slug": "freie-plakatserie",
+    "year": "2023 – 2025",
+    "tags": [
+      "Grafik",
+      "Video",
+      "Werbung"
+    ],
+    "cover": "assets/img/Social-Ads_MainPic_2.png",
+    "coverPosition": "70%"
+  }
+]
