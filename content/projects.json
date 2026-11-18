@@ -10,5 +10,31 @@
     ],
     "cover": "assets/img/Social-Ads_MainPic_2.png",
     "coverPosition": "70%"
+  },
+  {
+    "title": "Entspannungskarten",
+    "slug": "entspannungskarten",
+    "year": "2020",
+    "tags": [
+      "Grafik",
+      "Ideen"
+    ],
+    "cover": "assets/img/alle_karten_1.jpg",
+    "short": "Eine Entspannungshilfe im Hosentaschenformat: fünf einfache Taktiken zum Runterkommen, ganz ohne Bildschirm.",
+    "text": "Die moderne Welt kann einem schnell zu viel werden. Meditations-Apps und -Videos versprechen Ruhe und Achtsamkeit, doch um sie zu finden, schaut man ausgerechnet auf das Gerät, das einen Großteil des Stresses verursacht. Ich finde, man darf das Handy ruhig öfter mal weglegen. Deshalb habe ich eine kleine Entspannungshilfe gestaltet, die in jede Hosentasche passt.\n\n„Einfache Taktiken zum Runterkommen“ ist eine Sammlung aus fünf simplen Beruhigungstechniken. Sie sollen helfen, die eigenen Gedanken aus dem negativen Strudel zu holen.\n\nDie Typografie jeder Karte spiegelt die jeweilige Taktik wider. Die Textur im Hintergrund lädt dazu ein, die positiv wirkenden Farben genauer zu betrachten und für sich selbst zu deuten.\n\nDas Etui hat einen Magnetverschluss, der den Spieltrieb weckt und nervöse Finger beschäftigt. Außerdem bleibt darin Platz, um die Karten mit eigenen Notizen oder Fotos zu ergänzen, die einem helfen, wieder zu sich zu finden.",
+    "media": [
+      {
+        "src": "assets/img/alle_karten_2.jpg"
+      },
+      {
+        "src": "assets/img/alle_karten_4.jpg"
+      },
+      {
+        "src": "assets/img/alle_karten_5.jpg"
+      },
+      {
+        "src": "assets/img/alle_karten.jpg"
+      }
+    ]
   }
 ]
