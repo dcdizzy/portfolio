@@ -1,17 +1,5 @@
 [
   {
-    "title": "Social Ads",
-    "slug": "freie-plakatserie",
-    "year": "2023 – 2025",
-    "tags": [
-      "Grafik",
-      "Video",
-      "Werbung"
-    ],
-    "cover": "assets/img/Social-Ads_MainPic_2.png",
-    "coverPosition": "70%"
-  },
-  {
     "title": "Entspannungskarten",
     "slug": "entspannungskarten",
     "year": "2020",
@@ -36,5 +24,17 @@
         "src": "assets/img/alle_karten.jpg"
       }
     ]
+  },
+  {
+    "title": "Social Ads",
+    "slug": "freie-plakatserie",
+    "year": "2023 – 2025",
+    "tags": [
+      "Grafik",
+      "Video",
+      "Werbung"
+    ],
+    "cover": "assets/img/Social-Ads_MainPic_2.png",
+    "coverPosition": "70%"
   }
 ]
