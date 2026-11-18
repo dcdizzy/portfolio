@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pascal Pampel — Gestaltung</title>
+  <meta name="description" content="Pascal Pampel — audiovisuelle Gestaltung zwischen digitaler Flexibilität und analogem Anspruch. Mediengestalter & Designer aus Nürnberg." />
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ============ NAV ============ -->
+  <header class="nav" id="nav">
+    <div class="nav__inner">
+      <a class="nav__brand" href="#top" id="navBrand" aria-label="Nach oben">
+        <span class="nav__brand-a">Pascal Pampel</span>
+      </a>
+      <nav class="nav__links" aria-label="Hauptnavigation">
+        <a href="#leistungen" data-sec="leistungen">Leistungen</a>
+        <a href="#arbeiten" data-sec="arbeiten">Arbeiten</a>
+        <a href="#ueber" data-sec="ueber">Über mich</a>
+        <a href="#kontakt" data-sec="kontakt">Kontakt</a>
+      </nav>
+      <nav class="nav__icons" aria-label="Navigation">
+        <a href="#leistungen" data-sec="leistungen" aria-label="Leistungen"><svg viewBox="0 0 20 20"><clipPath id="ni-l"><path d="M4.5 3.5h3.6v8.4h8.4v3.6h-12z"/></clipPath><path d="M4.5 3.5h3.6v8.4h8.4v3.6h-12z" class="ic-in" clip-path="url(#ni-l)"/><path d="M4.5 3.5v12h12"/></svg></a>
+        <a href="#arbeiten" data-sec="arbeiten" aria-label="Arbeiten"><svg viewBox="0 0 20 20"><clipPath id="ni-t"><path d="M10 3.2 17 16H3z"/></clipPath><path d="M10 3.2 17 16H3z" class="ic-in" clip-path="url(#ni-t)"/><path d="M10 3.2 17 16H3z" class="ic"/></svg></a>
+        <a href="#ueber" data-sec="ueber" aria-label="Über mich"><svg viewBox="0 0 20 20"><clipPath id="ni-c"><circle cx="10" cy="10" r="6.6"/></clipPath><circle cx="10" cy="10" r="6.6" class="ic-in" clip-path="url(#ni-c)"/><circle cx="10" cy="10" r="6.6" class="ic"/></svg></a>
+        <a href="#kontakt" data-sec="kontakt" aria-label="Kontakt"><svg viewBox="0 0 20 20"><clipPath id="ni-r"><rect x="4" y="4" width="12" height="12"/></clipPath><rect x="4" y="4" width="12" height="12" class="ic-in" clip-path="url(#ni-r)"/><rect x="4" y="4" width="12" height="12" class="ic"/></svg></a>
+      </nav>
+    </div>
+    <div class="nav__line"></div>
+  </header>
+
+  <!-- ============ SCREEN 1: HERO ============ -->
+  <section class="hero" id="top">
+    <canvas class="hero__gl" id="heroGL" aria-hidden="true"></canvas>
+
+    <div class="hero__orbit" id="orbit" aria-label="audiovisuelle Gestaltung zwischen digitaler Flexibilität und analogem Anspruch">
+      <svg class="hero__svg" id="orbitSvg" viewBox="-240 -120 480 240" aria-hidden="true">
+        <defs>
+          <path id="pillPath" d="" />
+        </defs>
+        <use id="orbitRing" class="hero__ring" href="#pillPath" />
+        <g id="ghosts"></g>
+        <text class="hero__orbit-text" id="orbitText"><textPath id="orbitTP" href="#pillPath">audiovisuelle Gestaltung zwischen digitaler Flexibilität und analogem Anspruch</textPath></text>
+      </svg>
+
+      <svg class="hero__logo" id="heroLogo" viewBox="0 0 59 53" fill="none" aria-hidden="true">
+        <path d="M19.7246 0.5H38.9483C49.5582 0.5 58.1721 9.1139 58.1721 19.7239C58.1721 30.3338 49.5582 38.9478 38.9483 38.9478H19.7246V51.764" stroke-miterlimit="1.5" stroke-linecap="square" stroke="currentColor"/>
+        <path d="M0.5 51.7643V24.632H35.5973C38.3276 24.632 40.5412 22.4184 40.5412 19.6878C40.5412 16.9575 38.3276 14.7439 35.5973 14.7439H0.5" stroke-miterlimit="1.5" stroke-linecap="square" stroke="currentColor"/>
+      </svg>
+    </div>
+
+  </section>
+
+  <!-- Fliegende Kategorien: Kreise (Leistungen) -> Pillen (Arbeiten) -->
+  <div class="chips" id="chips">
+    <svg class="goo" id="goo" aria-hidden="true">
+      <defs>
+        <filter id="gooF" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b" />
+          <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="g" />
+          <feMorphology in="g" operator="erode" radius="1" result="e" />
+          <feComposite in="g" in2="e" operator="out" />
+        </filter>
+      </defs>
+      <g filter="url(#gooF)" id="gooG"></g>
+    </svg>
+  </div>
+
+  <!-- ============ SCREEN 2: LEISTUNGEN ============ -->
+  <section class="section leistungen" id="leistungen">
+    <h2 class="display reveal-title">Leistungen</h2>
+    <div class="slots slots--circles" id="slotCircles">
+      <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+    </div>
+    <div class="leistungen__body">
+      <p class="leistungen__desc" id="serviceDesc"></p>
+      <ul class="leistungen__list" id="serviceList"></ul>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 3: ARBEITEN ============ -->
+  <section class="arbeiten" id="arbeiten">
+    <div class="arbeiten__head">
+      <h2 class="display reveal-title">Arbeiten</h2>
+      <div class="slots slots--pills" id="slotPills">
+        <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+      </div>
+    </div>
+    <div class="track-wrap" id="trackWrap">
+      <div class="track" id="track"></div>
+    </div>
+    <div class="arbeiten__meta">
+      <div class="dots" id="dots" role="tablist" aria-label="Projekte">
+        <span class="dots__track"></span><span class="dots__fill" id="dotsFill"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 4: ÜBER MICH ============ -->
+  <section class="section ueber" id="ueber">
+    <h2 class="display reveal-title">Über mich</h2>
+
+    <figure class="ueber__banner is-placeholder" id="ueberBanner">
+      <span class="ueber__ph">Bild folgt</span>
+    </figure>
+
+    <div class="ueber__cols">
+      <div class="ueber__col reveal">
+        <p>Ich bin Pascal, 30 Jahre alt und wohne derzeit in Nürnberg. Ich bin ausgebildeter Mediengestalter und habe einen Bachelor in Design. Erfahrung durfte ich in Agenturen verschiedener Größe, Start-ups und freien Projekten sammeln.</p>
+        <p>Gestaltung orientiert sich für mich an der Logik und Ästhetik der Natur und lebt im Spannungsfeld des Gewohnten und des kontrollierten Bruchs.</p>
+      </div>
+      <div class="ueber__col reveal">
+        <p>Ich arbeite multidisziplinär und bewusst breit gefächert. Mit Wurzeln im Grafikdesign und Erfahrung in Schnitt, Animation und Musik ermöglichen mir moderne Werkzeuge und KI eine flexible Herangehensweise, ohne den Fokus auf Qualität und inhaltliche Substanz zu verlieren.</p>
+        <p>Derzeit bilde ich mich im Bereich Webdesign und generativ Node-basierter Animation weiter.</p>
+      </div>
+      <div class="ueber__col reveal">
+        <p>Gern arbeite ich eigenverantwortlich, schätze aber auch sehr das kreative Zusammenspiel im Team. Aus mehreren Jahren freiberuflicher Tätigkeit bin ich es gewohnt, Projekte selbstständig zu strukturieren und verantwortungsbewusst umzusetzen.</p>
+        <p>Neue Software oder Werkzeuge schrecken mich nicht ab, ich probiere und experimentiere gerne. Rund drei Viertel meines Besitzes sind übrigens gebraucht und selbst aufgearbeitet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 5: FOOTER ============ -->
+  <footer class="footer" id="kontakt">
+    <div class="footer__top">
+      <ul class="footer__links reveal">
+        <li><a href="mailto:kontakt@pascalpampel.de">kontakt@pascalpampel.de</a></li>
+        <li><a href="#" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="#" target="_blank" rel="noopener">LinkedIn</a></li>
+      </ul>
+    </div>
+
+    <button class="wordmark" id="wordmark" type="button" aria-label="Pascal Pampel — Player öffnen">
+      <span class="wordmark__text" id="wordmarkText">Pascal Pampel</span>
+      <span class="wordmark__tip">▶ Eine Nachricht aus der Vergangenheit.avi</span>
+    </button>
+
+    <div class="footer__legal"><button type="button" class="legal-open" id="legalOpen">Rechtliches</button><span class="footer__legal-links">© 2026</span></div>
+
+    <div class="footer__strip">
+      <canvas id="footGL" aria-hidden="true"></canvas>
+    </div>
+  </footer>
+
+  <!-- ============ PROJEKT-OVERLAY ============ -->
+  <div class="pov" id="pov" aria-hidden="true" role="dialog" aria-label="Projekt">
+    <canvas class="pov__gl" id="povGL" aria-hidden="true"></canvas>
+    <div class="pov__grain" aria-hidden="true"></div>
+    <div class="pov__lb" id="povLB" hidden>
+      <figure class="pov__lb-fig"></figure>
+      <button type="button" class="pov__lb-nav pov__lb-prev" data-lb-prev aria-label="Vorheriges Bild"><svg viewBox="0 0 16 16"><path d="M10.5 2.5 5 8l5.5 5.5"/></svg></button>
+      <button type="button" class="pov__lb-nav pov__lb-next" data-lb-next aria-label="Nächstes Bild"><svg viewBox="0 0 16 16"><path d="M5.5 2.5 11 8l-5.5 5.5"/></svg></button>
+    </div>
+    <div class="pov__panel" id="povPanel" tabindex="-1" data-lenis-prevent>
+      <article class="project" id="povProject"></article>
+      <div class="panel__bar panel__bar--end">
+        <button type="button" class="back" data-back aria-label="Alle Arbeiten"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5 5 8l5.5 5.5" /></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ WIN98 PLAYER ============ -->
+  <div class="w98-outline" id="w98Outline"></div>
+
+  <div class="w98" id="player" role="dialog" aria-label="Eine Nachricht aus der Vergangenheit.avi" hidden>
+    <div class="w98__title" id="playerTitle">
+      <span class="w98__ico"><svg viewBox="-2 -2 63 57" aria-hidden="true"><path d="M19.7 .5h19.2c10.6 0 19.3 8.6 19.3 19.2S49.5 39 38.9 39H19.7v12.8"/><path d="M.5 51.8V24.6h35.1a4.9 4.9 0 0 0 0-9.9H.5"/></svg></span>
+      <span class="w98__title-text">Eine Nachricht aus der Vergangenheit.avi</span>
+      <span class="w98__btns">
+        <button type="button" class="w98__sys" id="pMin" aria-label="Minimieren"><i class="g-min"></i></button>
+        <button type="button" class="w98__sys" id="pMax" aria-label="Maximieren"><i class="g-max"></i></button>
+        <button type="button" class="w98__sys w98__sys--x" id="pClose" aria-label="Schließen"><i class="g-x"></i></button>
+      </span>
+    </div>
+    <div class="w98__menu"><span><u>D</u>atei</span><span><u>A</u>nsicht</span><span><u>W</u>iedergabe</span><span><u>C</u>lips</span><span><u>F</u>avoriten</span><span><u>H</u>ilfe</span></div>
+
+    <div class="w98__body">
+      <div class="rp-top">
+        <div class="rp-screen bevel-in">
+          <canvas id="rpCanvas" width="320" height="240"></canvas>
+          <video id="rpVideo" src="assets/video/kindervideo.mp4" preload="auto" playsinline hidden></video>
+        </div>
+      </div>
+
+      <div class="rp-seek bevel-in" id="rpSeek"><div class="rp-seek__fill" id="rpSeekFill"></div><div class="rp-thumb bevel-out" id="rpThumb"></div></div>
+
+      <div class="rp-ctrl">
+        <button class="rp-b bevel-out" id="rpPlay" title="Wiedergabe"><i class="g-play"></i></button>
+        <button class="rp-b bevel-out" id="rpStop" title="Stopp"><i class="g-stop"></i></button>
+        <span class="rp-sep"></span>
+        <button class="rp-b bevel-out" id="rpPrev" title="Vorheriger Clip"><i class="g-prev"></i></button>
+        <button class="rp-b bevel-out" id="rpNext" title="Nächster Clip"><i class="g-next"></i></button>
+        <span class="rp-sep"></span>
+        <div class="rp-vol" id="rpVol" role="slider" aria-label="Lautstärke" aria-valuemin="0" aria-valuemax="100" aria-valuenow="60" tabindex="0"><i class="rp-vol__spk"></i><div class="rp-vol__wedge"><div class="rp-vol__fill"></div></div><div class="rp-vol__thumb bevel-out"></div></div>
+      </div>
+
+      <div class="w98__status">
+        <div class="bevel-in st-main" id="rpStatus">Bereit</div>
+        <div class="bevel-in st-kbps" id="rpKbps">28.8 Kbps</div>
+        <div class="bevel-in st-time" id="rpTime">0:00 / 0:09</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="w98-task" id="playerTask" type="button" hidden><span class="w98__ico"><svg viewBox="-2 -2 63 57" aria-hidden="true"><path d="M19.7 .5h19.2c10.6 0 19.3 8.6 19.3 19.2S49.5 39 38.9 39H19.7v12.8"/><path d="M.5 51.8V24.6h35.1a4.9 4.9 0 0 0 0-9.9H.5"/></svg></span>Eine Nachricht aus der Vergangenheit.avi</button>
+
+  <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js" defer></script>
+  <!-- Projektdaten kommen aus content/projects.json – diese Datei bearbeitet das CMS (app.pagescms.org) -->
+  <script>
+    (async () => {
+      try {
+        const r = await fetch("content/projects.json", { cache: "no-store" });
+        if (r.ok) { const d = await r.json(); window.PP_DATA = { projects: Array.isArray(d) ? d : (d.projects || []) }; }
+      } catch (e) {}
+      const s = document.createElement("script"); s.src = "js/main.js"; document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>
