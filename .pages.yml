@@ -1,0 +1,79 @@
+# Einstellungen für Pages CMS (app.pagescms.org)
+media:
+  input: assets/img
+  output: assets/img
+
+content:
+  - name: projekte
+    label: Projekte
+    type: file
+    path: content/projects.json
+    format: json
+    list: true
+    fields:
+      - name: title
+        label: Titel
+        type: string
+        required: true
+      - name: slug
+        label: Kurzname für die Adresse (klein, ohne Leerzeichen, z. B. huk-coburg)
+        type: string
+        required: true
+      - name: year
+        label: Jahr
+        type: string
+      - name: tags
+        label: Kategorien (für die Filter)
+        type: select
+        options:
+          multiple: true
+          values:
+            - name: Grafik
+              label: Grafik
+            - name: Video
+              label: Video
+            - name: UX
+              label: UX
+            - name: Werbung
+              label: Werbung
+            - name: Ideen
+              label: Ideen
+      - name: cover
+        label: Titelbild (Karte)
+        type: image
+      - name: coverPosition
+        label: Bildausschnitt der Karte (z. B. "50% 40%" – optional)
+        type: string
+      - name: short
+        label: Kurzbeschreibung (max. 3 Zeilen – Karte und erster Absatz der Projektseite)
+        type: text
+      - name: text
+        label: Weiterer Text (Projektseite; Leerzeile = neuer Absatz)
+        type: text
+      - name: media
+        label: Bilder & Videos (Projektseite)
+        type: object
+        list:
+          collapsible:
+            collapsed: true
+            summary: "{fields.caption} ({fields.type})"
+        fields:
+          - name: type
+            label: Art
+            type: select
+            options:
+              values:
+                - name: image
+                  label: Bild
+                - name: video
+                  label: Video
+          - name: src
+            label: Datei
+            type: file
+          - name: caption
+            label: Bildunterschrift (optional)
+            type: string
+      - name: palette
+        label: Farben des Hintergrunds (optional, 4 Hex-Werte wie #1a2b3c – dunkel, mittel, hell, Akzent)
+        type: string
+        list: true
