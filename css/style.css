@@ -25,8 +25,6 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { background: var(--bg); }
-html.lenis, html.lenis body { height: auto; }
-.lenis.lenis-smooth { scroll-behavior: auto !important; }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -101,10 +99,40 @@ body:not(.is-loaded) .nav__line { transform: scaleX(0); }
 .hero__orbit { z-index: 2; }
 /* Film-Grain als eigene Ebene: bleibt scharf, während die Animation weich gezeichnet ist */
 .hero::after, .footer__strip::after {
-  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background-image: var(--grain); background-position: var(--gx, 0) var(--gy, 0);
+  content: ""; position: absolute; inset: -160px; z-index: 1; pointer-events: none;
+  background-image: var(--grain);
   mix-blend-mode: overlay; opacity: .06;   /* etwas weniger Korn */
+  animation: grain-jump 1s steps(1, end) infinite; will-change: transform;
 }
+/* Korn springt 24× pro Sekunde – als reine Verschiebung auf der Grafikkarte (vorher per JS an der Wurzel:
+   das hat jedes Mal die Stile der ganzen Seite neu berechnen lassen und war die Hauptursache fürs Hakeln) */
+@keyframes grain-jump {
+  0.000% { transform: translate3d(2px, -42px, 0); }
+  4.167% { transform: translate3d(21px, -68px, 0); }
+  8.333% { transform: translate3d(-62px, 57px, 0); }
+  12.500% { transform: translate3d(-56px, 13px, 0); }
+  16.667% { transform: translate3d(69px, -66px, 0); }
+  20.833% { transform: translate3d(49px, -26px, 0); }
+  25.000% { transform: translate3d(-71px, -58px, 0); }
+  29.167% { transform: translate3d(31px, 27px, 0); }
+  33.333% { transform: translate3d(-63px, -19px, 0); }
+  37.500% { transform: translate3d(-57px, 61px, 0); }
+  41.667% { transform: translate3d(28px, -65px, 0); }
+  45.833% { transform: translate3d(64px, -49px, 0); }
+  50.000% { transform: translate3d(-23px, 80px, 0); }
+  54.167% { transform: translate3d(69px, -65px, 0); }
+  58.333% { transform: translate3d(67px, 69px, 0); }
+  62.500% { transform: translate3d(21px, -68px, 0); }
+  66.667% { transform: translate3d(-24px, -69px, 0); }
+  70.833% { transform: translate3d(62px, -46px, 0); }
+  75.000% { transform: translate3d(-6px, 27px, 0); }
+  79.167% { transform: translate3d(-44px, 58px, 0); }
+  83.333% { transform: translate3d(-50px, 66px, 0); }
+  87.500% { transform: translate3d(-2px, 63px, 0); }
+  91.667% { transform: translate3d(-34px, -54px, 0); }
+  95.833% { transform: translate3d(68px, 66px, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .hero::after, .footer__strip::after, .pov__grain { animation: none; } }
 .hero__orbit {
   position: absolute; left: 50%; top: 50%;
   width: min(480px, 86vw); aspect-ratio: 2 / 1;
@@ -113,11 +141,10 @@ body:not(.is-loaded) .nav__line { transform: scaleX(0); }
   -webkit-tap-highlight-color: transparent;
 }
 .hero__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; will-change: transform; }
-.hero__orbit-text, .hero__ghost {
+.hero__orbit-text {
   font-family: var(--sans); font-weight: 400; font-size: 13.5px;
   fill: var(--ink); letter-spacing: .1px;
 }
-.hero__ghost { fill: #fff; }
 .hero__ring { fill: none; stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; }
 .hero__logo {
   position: absolute; left: 50%; top: 50%;
@@ -126,16 +153,19 @@ body:not(.is-loaded) .nav__line { transform: scaleX(0); }
   will-change: transform, filter;
 }
 .hero__scroll {
-  position: absolute; left: 50%; bottom: 34px; width: 1px; height: 54px;
-  background: rgba(255,255,255,.18); overflow: hidden;
+  position: absolute; left: 50%; bottom: clamp(22px, 4vh, 40px); z-index: 3; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 14px; color: var(--ink);
+  transition: opacity .25s linear;
 }
-.hero__scroll span {
-  position: absolute; inset: 0; background: #fff;
-  animation: scrollcue 2.2s var(--ease-io) infinite;
-}
-@keyframes scrollcue {
-  0% { transform: translateY(-100%); } 60%, 100% { transform: translateY(100%); }
-}
+.hero__scroll > * { animation: hintIn .9s var(--ease-out) 1.4s both; }   /* erscheint nach dem Intro */
+@keyframes hintIn { from { opacity: 0; transform: translateY(-8px); } }
+.hero__scroll i { position: relative; display: block; width: 4px; height: 48px; }
+/* alle 10 s fällt ein kleiner Punkt nach unten – eine durchgehende, weiche Bewegung */
+.hero__scroll span { position: absolute; left: 0; top: 0; width: 4px; height: 4px; border-radius: 50%; background: var(--ink);
+  opacity: 0; animation: dropY 10s 2.3s infinite, dropA 10s linear 2.3s infinite; will-change: transform, opacity; }
+@keyframes dropY { 0% { transform: translateY(0); animation-timing-function: var(--ease-io); } 14%, 100% { transform: translateY(44px); } }
+@keyframes dropA { 0% { opacity: 0; } 3.5% { opacity: 1; } 9.5% { opacity: 1; } 14%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .hero__scroll span { animation: none; } }
 
 /* Intro */
 body:not(.is-loaded) .hero__orbit { opacity: 0; }
@@ -186,10 +216,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
 
 /* v20: Ebene liegt im Dokument (nicht fixed) → Pillen, die an ihrem Platz ruhen, scrollen nativ mit, ohne Nachzittern */
 .chips { position: absolute; left: 0; top: 0; width: 100%; height: 0; pointer-events: none; z-index: 20; }
-.goo-gl { position: fixed; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
-.goo { position: fixed; inset: 0; width: 100%; height: 100%; overflow: visible; display: none; }
-.goo.on { display: block; }
-.goo rect { fill: #e2e2e2; }
+.goo-gl { position: absolute; left: 0; top: 0; width: 100%; height: 100vh; display: none; pointer-events: none; will-change: transform; }
 .chip {
   position: absolute; left: 0; top: 0; transform-origin: 50% 50%;
   display: grid; place-items: center;
@@ -209,7 +236,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
   transform: scale(0); transition: transform .6s var(--ease-out);
   z-index: -1;
 }
-.chip__label { position: relative; transition: transform .5s var(--ease-out); }
+.chip__label { position: absolute; left: 50%; top: 50%; translate: -50% -50%; white-space: nowrap; transition: transform .5s var(--ease-out); will-change: transform; }   /* immer exakt mittig, auch wenn sie beim Skalieren kurz breiter ist als die Pille */
 .chip.is-on { color: var(--bg); background-color: var(--ink); }
 .chip.is-on .chip__fill { transform: scale(1.02); }
 .chip:not(.is-on):hover .chip__fill { transform: scale(.12); }
@@ -232,14 +259,14 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
 }
 .leistungen__desc .w, .leistungen__list li {
   display: inline-block; white-space: pre;
-  transition: opacity .55s var(--ease-out), transform .7s var(--ease-out), filter .55s;
+  transition: opacity .55s var(--ease-out), transform .7s var(--ease-out);
   transition-delay: calc(var(--i) * 12ms);
 }
 .leistungen__list { list-style: none; }
 .leistungen__list li { display: block; padding-left: 1.1em; position: relative; }
-.leistungen__list li::before { content: ""; position: absolute; left: .2em; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.leistungen__desc.out .w, .leistungen__list.out li { opacity: 0; transform: translateY(-.5em); filter: blur(6px); transition-delay: 0ms; }
-.leistungen__desc.pre .w, .leistungen__list.pre li { opacity: 0; transform: translateY(.7em); filter: blur(6px); transition: none; }
+.leistungen__list li::before { content: ""; position: absolute; left: .2em; top: .62em; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.leistungen__desc.out .w, .leistungen__list.out li { opacity: 0; transform: translateY(-.5em); transition-delay: 0ms; }
+.leistungen__desc.pre .w, .leistungen__list.pre li { opacity: 0; transform: translateY(.7em); transition: none; }
 
 /* =========================================================
    ARBEITEN · Reihe (optional horizontal) / Raster
@@ -308,7 +335,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
   display: grid; place-items: center; cursor: pointer;
 }
 .dot::before {
-  content: ""; width: 5px; height: 5px; border-radius: 50%; background: rgba(204,204,204,.35);
+  content: ""; width: 4px; height: 4px; border-radius: 50%; background: rgba(204,204,204,.35);
   transition: background .35s, transform .5s var(--ease-out);
 }
 .dot.is-past::before { opacity: 0; }
@@ -402,7 +429,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
 .footer__links a:hover::after { transform: scaleX(1); transform-origin: left; }
 
 .wordmark {
-  display: block; width: calc(100% - 2 * var(--pad)); margin: auto var(--pad) 0; padding-top: 60px;
+  display: block; width: calc(100% - 2 * var(--pad)); margin: 0 var(--pad) 28px; padding-top: 0;
   position: relative; text-align: center; line-height: .8;
 }
 .wordmark__text {
@@ -422,7 +449,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
 .footer__strip { position: relative; height: var(--striph, 145px); overflow: hidden; }   /* so hoch wie Name + Zeile darunter (per JS) */
 .footer__strip canvas { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); display: block; filter: blur(1.6px); }
 .footer__legal {
-  display: flex; align-items: flex-start; padding: 6px var(--pad) 30px;
+  display: flex; align-items: flex-start; margin-top: auto; padding: 60px var(--pad) 14px;   /* kleine Zeile über dem großen Namen */
   font-size: 12px; letter-spacing: 2.4px; text-transform: uppercase; color: var(--ink);   /* wie Name in der Nav */
 }
 .footer__legal > * { white-space: nowrap; }
@@ -471,7 +498,6 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
 .w98__sys:active { box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px #808080; }
 .w98__sys i { position: absolute; left: 4px; top: 3px; }
 .g-min { width: 6px; height: 2px; background: #000; top: 8px !important; }
-.g-max { width: 8px; height: 7px; border: 1px solid #000; border-top-width: 2px; left: 3px !important; top: 2px !important; }
 .g-x { width: 8px; height: 7px; left: 3px !important; top: 3px !important;
   background:
     linear-gradient(45deg, transparent 43%, #000 43%, #000 57%, transparent 57%),
@@ -559,6 +585,14 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
   .card__desc { font-size: 14px; color: rgba(204,204,204,.85); }
   .card__tags span { border-color: rgba(204,204,204,.5); font-size: 11px; }
   .card:hover .card__img { filter: none; }
+  /* Hover in der Kompaktansicht: dunkles, abgerundetes Feld hinter der ganzen Karte (Inhalt bewegt sich nicht) */
+  .card { isolation: isolate; }
+  .card::before { content: ""; position: absolute; inset: -12px -12px -16px; z-index: -1; border-radius: 16px;
+    background: #151515; opacity: 0; transition: opacity .3s var(--ease-out); pointer-events: none; }
+  .card:focus-visible::before { opacity: 1; }
+  .card:focus-visible { outline: none; }
+  /* Platz oben/unten, damit das Feld nicht von der Kartenreihe abgeschnitten wird (Lage bleibt gleich) */
+  .track-wrap { padding: 12px 0 16px; margin-top: calc(clamp(26px, 3vw, 40px) - 12px); margin-bottom: -16px; }
   .nav__links { display: none; }
   .nav__icons { display: flex; }
   .leistungen__body { grid-template-columns: 1fr; gap: 20px; }
@@ -578,6 +612,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
 .card { cursor: pointer; }
 .track-wrap.is-drag .card { cursor: grabbing; }
 body { transition: opacity .42s var(--ease-out), filter .42s var(--ease-out); }
+html:not(.is-ready) body { opacity: 0; transition: none; }
 body.is-leaving { opacity: 0; filter: blur(6px); }
 
 /* =========================================================
@@ -590,9 +625,10 @@ body.is-leaving { opacity: 0; filter: blur(6px); }
 .pov__gl { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); display: block; filter: blur(1.6px); opacity: 0; transition: opacity .6s var(--ease-out); }
 .pov.is-open .pov__gl { opacity: 1; }
 /* Grain im Overlay: liegt nur auf dem Rahmen-Canvas (eigene Ebene, ohne Mischmodus über dem Panel) */
+.pov { overflow: hidden; }
 .pov__grain {
-  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s;
-  background-image: var(--grain); background-position: var(--gx, 0) var(--gy, 0);
+  position: absolute; inset: -160px; pointer-events: none; opacity: 0; transition: opacity .9s;
+  background-image: var(--grain); animation: grain-jump 1s steps(1, end) infinite; will-change: transform;
 }
 .pov.is-open .pov__grain { opacity: .05; }
 .pov__panel {
@@ -614,13 +650,11 @@ body.pov-open .nav::before { opacity: 0; }
 .nav::before { transition: opacity .6s; }
 /* Abstände im Panel aus einer Einheit abgeleitet: --u = Innenabstand des Panels */
 .pov__panel { --u: clamp(20px, 3.4vw, 56px); }
-.panel__bar--end { display: flex; padding: 0 var(--u) calc(var(--u) * .7); }
 .project__bar { display: flex; align-items: center; justify-content: space-between; height: 40px; }
 /* Zurück: nur eine L-förmige Pfeilspitze */
 .back { display: grid; place-items: center; width: 40px; height: 40px; margin-left: -12px; color: var(--ink); }
 .back svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: square; transition: transform .45s var(--ease-out); }
 .back:hover svg { transform: translateX(-4px); }
-.panel__count { color: rgba(204,204,204,.6); }
 
 .project { padding: calc(var(--u) * .8) var(--u) calc(var(--u) * .6); }
 .pov .split__info > *, .pov .split__media > * { opacity: 0; transform: translateY(26px); transition: opacity .7s var(--ease-out), transform .8s var(--ease-out); transition-delay: calc(var(--i, 0) * 50ms + 140ms); }
@@ -659,24 +693,13 @@ body.pov-open .nav::before { opacity: 0; }
 .project__text p { break-inside: avoid; margin-bottom: 1.2em; }
 .project__text a { text-decoration: underline; text-underline-offset: 3px; }
 
-.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 10px clamp(20px, 4vw, 56px) 48px; }
-.pager a { position: relative; display: block; padding: 22px 24px; border-radius: 10px; border: 1px solid rgba(204,204,204,.25); overflow: hidden; transition: border-color .4s, background .4s; }
-.pager a:hover { border-color: var(--ink); background: rgba(255,255,255,.03); }
-.pager small { display: block; font-size: 12px; letter-spacing: 3.6px; text-transform: uppercase; color: rgba(204,204,204,.6); margin-bottom: 8px; }
-.pager b { font-family: var(--display); font-weight: 400; font-size: clamp(22px, 2.2vw, 34px); text-transform: uppercase; }
-.pager .next { text-align: right; }
 
 
-.pager button { font: inherit; color: inherit; background: none; text-align: left; cursor: pointer; }
-.pager button.next { text-align: right; }
-.pager button { position: relative; display: block; padding: 22px 24px; border-radius: 10px; border: 1px solid rgba(204,204,204,.25); transition: border-color .4s, background .4s; }
-.pager button:hover { border-color: var(--ink); background: rgba(255,255,255,.03); }
 .back { cursor: pointer; background: none; border: 0; padding: 0; }
 @media (max-width: 900px) {
   .pov__panel { left: var(--pad); right: var(--pad); bottom: var(--pad); top: 118px; }
   .pov .split { grid-template-columns: 1fr; }
   .pov .split__info { position: static; }
-  .pov .pager { grid-template-columns: 1fr; }
 }
 
 /* v19 – Handy: Logo in der Pille, Name in der Nav etwas kleiner, Icons enger */
@@ -738,3 +761,70 @@ body.pov-open .nav::before { opacity: 0; }
 
 .arbeiten.is-empty .dots { display: none; }
 .work-empty { text-align: center; padding: 80px var(--pad); font-size: 12px; letter-spacing: 2.4px; text-transform: uppercase; color: rgba(204,204,204,.6); }
+
+/* nichts darf die Seite seitlich verschiebbar machen */
+html, body { overflow-x: clip; }
+.hero, .footer { overflow-x: clip; }
+
+/* Projektseite: Spalten dürfen schmaler werden als ein langes Wort (der Titel wird dann per JS verkleinert),
+   und das Panel scrollt nur senkrecht */
+.split { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.split__info, .split__media { min-width: 0; }
+@media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.pov__panel { overflow-x: hidden; }
+.pov .legal, .pov .legal * { overflow-wrap: anywhere; }
+
+/* ===== v33: Einblendungen deutlich schneller – erscheint fast sofort, nur ein Hauch Bewegung ===== */
+.reveal-title .ch { transform: translateY(60%) rotate(2deg); transition: transform .38s var(--ease-out), opacity .3s var(--ease-out); transition-delay: calc(var(--i) * 14ms); }
+.reveal { transform: translateY(10px); transition: opacity .35s var(--ease-out), transform .4s var(--ease-out); }
+.leistungen__desc .w, .leistungen__list li { transition: opacity .25s var(--ease-out), transform .3s var(--ease-out); transition-delay: calc(var(--i) * 4ms); }
+@media (min-width: 901px) {   /* Hover-Einblendung nur am Desktop – in der Handy-Ansicht steht der Text fest */
+  .card__info > * { transform: translateY(10px); transition-duration: .3s !important; }
+  .card:hover .card__info > :nth-child(2) { transition-delay: 25ms; }
+  .card:hover .card__info > :nth-child(3) { transition-delay: 50ms; }
+  .card:hover .card__info > :nth-child(4) { transition-delay: 75ms; }
+}
+.pov .split__info > *, .pov .split__media > *, .pov .legal > * { transform: translateY(10px); transition: opacity .35s var(--ease-out), transform .4s var(--ease-out); transition-delay: calc(var(--i, 0) * 25ms + 60ms); }
+/* Karte und Hintergrund kommen gleichzeitig */
+.pov__panel { transition: transform .55s var(--ease-out), opacity .4s var(--ease-out); }
+.pov.is-open .pov__panel { transition-delay: 0s; }
+
+/* Tags auf den Karten: eine Zeile, bei Bedarf seitlich scrollbar */
+.card__tags { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; max-width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+.card__tags::-webkit-scrollbar { display: none; }
+.card__tags span { flex: none; white-space: nowrap; }
+
+/* Projektseite: Kopfzeile erscheint, sobald die Überschrift weggescrollt ist */
+.pov__head { position: sticky; top: 0; z-index: 5; height: 64px; margin-bottom: -64px;
+  display: flex; align-items: center; gap: 14px; padding: 0 var(--u); background: var(--bg);
+  transform: translateY(-100%); opacity: 0; pointer-events: none;
+  transition: transform .4s var(--ease-out), opacity .3s var(--ease-out); }
+.pov__panel.has-head .pov__head { transform: none; opacity: 1; pointer-events: auto; }
+.pov__head .back { margin-left: -12px; }
+.pov__head-title { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(18px, 1.7vw, 24px); line-height: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-top: .12em; }
+
+/* Desktop: Kontakt-Spalte über die ganze Breite, Einzug per JS bis unter „Leistungen“ */
+@media (min-width: 901px) { .footer__links { grid-column: 1 / -1; } }
+
+/* kein zweiter Zurück-Pfeil am Ende – dafür etwas Luft unter dem Inhalt */
+.pov .project { padding-bottom: calc(var(--u) * 1.2); }
+
+/* Zurück-Pfeil so groß wie der kleine Titel in der Kopfzeile */
+.back svg, .pov__head .back svg { width: clamp(13px, 1.2vw, 17px); height: clamp(13px, 1.2vw, 17px); stroke-width: 1.4; }
+.back { width: 32px; height: 32px; margin-left: -8px; }
+
+/* ===== Scrollen: nativ, der Browser rastet an den Abschnitten ein ===== */
+html { overflow-anchor: none; }   /* kein automatisches Nachschieben der Scrollposition */
+html, body { overscroll-behavior-y: none; }   /* kein Gummiband oben/unten – seitlich bleibt frei, damit Zurück-Wischen geht */
+html.no-scroll { overflow: hidden; }
+
+/* Hero-Verlauf: leicht weichgezeichnet wie der Footer – keine Pixeltreppen, keine Glitzerpunkte an feinen Kanten */
+.hero__gl { filter: blur(1.2px); }
+@media (max-width: 700px) { .hero__gl { filter: blur(1px); } }
+
+/* Handy: Kartenreihe nur waagerecht nativ wischen – senkrecht übernimmt das eigene Seiten-Scrollen */
+@media (pointer: coarse) { .track-wrap { touch-action: pan-x; } }
+
+@media (max-width: 900px) and (hover: hover) { .card:hover::before { opacity: 1; } }

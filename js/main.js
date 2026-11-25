@@ -38,7 +38,6 @@ const PROJECTS = ((window.PP_DATA && window.PP_DATA.projects) || []).map((p) => 
   slug: p.slug, title: p.title, year: p.year, tags: p.tags || [], img: p.cover, pos: p.coverPosition || "50% 50%", desc: p.short
 }));
 const IMG = (f) => f;
-const ALT = window.PP_INTRO === "alt";                    // alternative Intro-Animation
 const DATA = (window.PP_DATA && window.PP_DATA.projects) || [];
 const POV = { open: false, idx: -1, gl: null, pal: null, alpha: 0, t: 5 };
 
@@ -51,7 +50,10 @@ const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeIO = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
-let VW = innerWidth, VH = innerHeight, _pad = null;
+// Breite immer vom sichtbaren Bereich (clientWidth), nie innerWidth: am Handy kann innerWidth durch zu breiten Inhalt
+// mitwachsen → alles wird nach dieser falschen Breite bemessen und die Seite lässt sich seitlich verschieben
+const vpW = () => document.documentElement.clientWidth || innerWidth;
+let VW = vpW(), VH = innerHeight, _pad = null;
 // Höhen zwischenspeichern: im Frame-Loop nie offsetHeight lesen (würde nach Schreibzugriffen ein Layout erzwingen)
 let HERO_H = 0, NAV_H = 0, SCY = 0;   // SCY: Scrollposition einmal pro Frame gelesen
 const PAD = () => (_pad ??= parseFloat(getComputedStyle($(".nav")).paddingLeft) || 80);
@@ -134,6 +136,7 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform sampler2D uDisp;
 uniform float uHasDisp;
+uniform vec2 uDispPx;   // Größe einer Zelle der Maus-Simulation (in uv)
 uniform vec3 uC0;
 uniform vec3 uC1;
 uniform vec3 uC2;
@@ -167,7 +170,17 @@ void main(){
   vec2 luv = .5 + cc * (1. - .07 * dot(cc, cc));
 
   vec2 p = (luv - .5) * uRes / uRefH * uZoom;
-  vec2 d = uHasDisp > .5 ? texture2D(uDisp, uv).xy : vec2(0.);
+  // Maus-Verzerrung weich abtasten (9 Punkte): keine sichtbaren Kanten der groben Simulationszellen
+  vec2 d = vec2(0.);
+  if (uHasDisp > .5) {
+    vec2 o = uDispPx * 1.25;
+    d = texture2D(uDisp, uv).xy * 4.
+      + (texture2D(uDisp, uv + vec2(o.x, 0.)).xy + texture2D(uDisp, uv - vec2(o.x, 0.)).xy
+      +  texture2D(uDisp, uv + vec2(0., o.y)).xy + texture2D(uDisp, uv - vec2(0., o.y)).xy) * 2.
+      +  texture2D(uDisp, uv + o).xy + texture2D(uDisp, uv - o).xy
+      +  texture2D(uDisp, uv + vec2(o.x, -o.y)).xy + texture2D(uDisp, uv + vec2(-o.x, o.y)).xy;
+    d /= 16.;
+  }
   if (!(d.x == d.x) || !(d.y == d.y)) d = vec2(0.);
   d = clamp(d, -3., 3.);
   p -= d * .55;
@@ -255,7 +268,7 @@ class FlowGL {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    this.u = this.locs(this.main, ["uRes", "uTime", "uDisp", "uHasDisp", "uC0", "uC1", "uC2", "uC3", "uZoom", "uRefH", "uHue"]);
+    this.u = this.locs(this.main, ["uRes", "uTime", "uDisp", "uHasDisp", "uDispPx", "uC0", "uC1", "uC2", "uC3", "uZoom", "uRefH", "uHue"]);
     if (interactive) this.initSim();
     this.ok = true;
     this.resize();
@@ -288,7 +301,7 @@ class FlowGL {
   }
   sizeSim(w, h) {
     const gl = this.gl, s = this.sim; if (!s) return;
-    const sw = Math.max(16, Math.round(w / 8)), shh = Math.max(16, Math.round(h / 8));
+    const sw = Math.max(16, Math.round(w / 6)), shh = Math.max(16, Math.round(h / 6));   // feinere Zellen
     if (s.w === sw && s.h === shh) return;
     s.w = sw; s.h = shh;
     for (const t of [s.a, s.b]) {
@@ -306,8 +319,11 @@ class FlowGL {
     // kleine Bildschirme: höhere Auflösung, sonst wirkt der Verlauf am Handy pixelig
     const d = this.scale * (SMALL ? 1.9 : 1);   // ohne devicePixelRatio → Grain auf jedem Bildschirm gleich, und deutlich weniger GPU-Last
     const w = Math.max(2, Math.round(this.c.clientWidth * d)), h = Math.max(2, Math.round(this.c.clientHeight * d));
-    if (this.c.width !== w || this.c.height !== h) { this.c.width = w; this.c.height = h; }
+    const changed = this.c.width !== w || this.c.height !== h;
+    if (changed) { this.c.width = w; this.c.height = h; }
     this.sizeSim(this.c.clientWidth, this.c.clientHeight);
+    // neue Canvas-Größe löscht das Bild → sofort neu zeichnen, sonst blitzt es beim Fenster-Ziehen schwarz
+    if (changed && this._t != null) this.render(this._t, 0);
   }
   updateMouse(dt) {
     const r = this.track.getBoundingClientRect();
@@ -323,6 +339,7 @@ class FlowGL {
   }
   render(time, dt) {
     if (!this.ok) return;
+    this._t = time;
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -355,6 +372,7 @@ class FlowGL {
     gl.uniform1f(u.uHue, this.hue || 0);
     gl.uniform1f(u.uRefH, this.refH ? this.refH() * this.c.height / this.c.clientHeight : this.c.height);
     gl.uniform1f(u.uHasDisp, this.sim ? 1 : 0);
+    if (this.sim) gl.uniform2f(u.uDispPx, 1 / this.sim.w, 1 / this.sim.h);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.sim ? this.sim.a.tex : null);
     gl.uniform1i(u.uDisp, 0);
@@ -367,7 +385,7 @@ const PAL_HERO = [[.094, .245, .14], [.18, .37, .14], [.38, .39, .12], [.54, .35
 const PAL_FOOT = [[.075, .10, .30], [.18, .27, .56], [.40, .23, .66], [.68, .19, .45]];    // Navy · Figma-Blau · Violett · Magenta
 const heroGL = new FlowGL($("#heroGL"), { palette: PAL_HERO, scale: window.__hs || .62, zoom: 2.4, trackEl: heroEl });
 const footGL = new FlowGL($("#footGL"), { palette: PAL_FOOT, scale: .62, zoom: 2.4, trackEl: footStrip, interactive: false });
-footGL.refH = () => heroEl.clientHeight;   // gleiche Musterdichte wie im Header
+footGL.refH = () => Math.min(heroEl.clientHeight, VW * (window.__fr || .625));   // Musterdichte wie am Desktop-Footer (1440×900), auch auf schmalen Bildschirmen
 
 /* Grain-Kachel einmal erzeugen und pro Bild zufällig verschieben */
 (function makeGrain() {
@@ -378,27 +396,16 @@ footGL.refH = () => heroEl.clientHeight;   // gleiche Musterdichte wie im Header
   document.documentElement.style.setProperty("--grain", `url(${g.toDataURL()})`);
 })();
 let grainT = 0;
-function updateGrain(dt) {
-  grainT += dt; if (grainT < 1 / 24) return; grainT = 0;
-  const r = document.documentElement.style;
-  r.setProperty("--gx", Math.floor(Math.random() * 160) + "px");
-  r.setProperty("--gy", Math.floor(Math.random() * 160) + "px");
-}
+// Korn: läuft jetzt komplett per CSS-Animation (siehe .hero::after) – kein Eingriff pro Frame
 
 /* =========================================================
    4. HERO · Laufschrift in Pillenform (Turbo) + Pille → Kreis
    ========================================================= */
 const orbit = $("#orbit"), orbitSvg = $("#orbitSvg"), heroLogo = $("#heroLogo");
-const tp = $("#orbitTP"), orbitText = $("#orbitText"), ghostsG = $("#ghosts"), pillPath = $("#pillPath");
+const tp = $("#orbitTP"), orbitText = $("#orbitText"), pillPath = $("#pillPath");
+const heroScroll = $("#heroScroll"); heroScroll._a = "1.000";
+heroScroll.addEventListener("click", (e) => { e.preventDefault(); scrollToY(docTop($("#leistungen"))); });
 const PILL = { hw: 126, r: 84 };
-const GHOSTS = Math.min(innerWidth, innerHeight) < 700 ? 3 : 6, ghosts = [];
-for (let i = 0; i < GHOSTS; i++) {
-  const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  t.setAttribute("class", "hero__ghost");
-  const p = document.createElementNS("http://www.w3.org/2000/svg", "textPath");
-  p.setAttribute("href", "#pillPath"); p.textContent = tp.textContent;
-  t.appendChild(p); ghostsG.appendChild(t); ghosts.push({ t, p, on: true });
-}
 const orbitState = { hw: PILL.hw, r: PILL.r, len: 0, baseFs: 13.5, baseLen: 0, lastD: "" };
 function setPill(hw, r) {
   hw = Math.max(0, hw);
@@ -418,7 +425,7 @@ function fitOrbitText() {
 }
 function setOrbitFont(fs) {
   const v = (Math.round(fs * 4) / 4).toFixed(2) + "px";   // in Viertelpixeln → seltener neues Text-Layout
-  if (orbitText.style.fontSize !== v) { orbitText.style.fontSize = v; ghosts.forEach((g) => (g.t.style.fontSize = v)); }
+  if (orbitText.style.fontSize !== v) orbitText.style.fontSize = v;
 }
 
 const turbo = { on: false, a: 0, k: 0, phase: .83, BASE: 34, MAX: 6000 };
@@ -427,7 +434,7 @@ orbit.addEventListener("pointerleave", () => (turbo.on = false));
 orbit.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") turbo.on = true; });
 addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") turbo.on = false; });
 
-const sPill = new Spring(120, 9.5);   // Pille → Kreis (bouncy)
+const sPill = new Spring(210, 15);   // Pille → Kreis (federnd, aber zügig)
 let splitP = 0;                        // 0..1  Kreis teilt sich in 5
 let ringM = 0;                         // 0..1  Schrift → Kontur
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -436,14 +443,14 @@ const orbitRing = $("#orbitRing");
 function updateOrbit(dt) {
   const H = HERO_H || (HERO_H = heroEl.offsetHeight);
   // Phase 1: Pille → Kreis
-  const m1 = ALT ? 0 : clamp(SCY / (H * .2));
+  const m1 = clamp(SCY / (H * .2));
   const s = sPill.step(easeIO(m1), dt);
   const sc = clamp(s);
   const over = s - sc;                                   // Über-/Unterschwinger → Wobble
   const r = PILL.r * (1 + over * .35 + (s < 0 ? s * .2 : 0));
   setPill(PILL.hw * (1 - sc) * (1 - Math.min(0, over) * 0), r);
   // Beim Weiterscrollen: Schrift beschleunigt, wird kleiner und wird zur Kontur (scroll-gesteuert, also auch rückwärts sauber)
-  const m2 = ALT ? clamp(SCY / (H * .13)) : clamp((SCY - H * .1) / (H * .17));
+  const m2 = clamp((SCY - H * .1) / (H * .17));
   ringM = m2;
   const shrink = 1 - .88 * Math.pow(m2, 1.3);
   const fs = orbitState.baseFs * Math.min(1, (orbitState.len * .9) / (orbitState.baseLen || 1)) * shrink;
@@ -462,18 +469,10 @@ function updateOrbit(dt) {
   const L = orbitState.len;
   turbo.phase = ((turbo.phase - v * dt / L) % 1 + 1) % 1;
   const off = turbo.phase * L;
-  const fadeNow = 1 - clamp(splitP * (ALT ? 7 : 3.5));
+  // Laufschrift-Kreis verschwindet gleich zu Beginn des Teilens – danach gibt es nur noch die flüssige Form
+  const fadeNow = 1 - smooth(0, .07, splitP);
   const textOn = textA > .004 && fadeNow > .004;          // unsichtbaren Text gar nicht erst neu setzen
   if (textOn) tp.setAttribute("startOffset", off.toFixed(1));
-  const spread = v * .009, gA = Math.max(k, accel) * .3 * textA;
-  ghosts.forEach((g, i) => {
-    const a = textOn ? gA * Math.pow(1 - i / GHOSTS, 1.5) : 0;
-    if (a < .004) { if (g.on) { g.t.style.visibility = "hidden"; g.on = false; } return; }
-    if (!g.on) { g.t.style.visibility = ""; g.on = true; }
-    let o = off + (i + 1) * spread; while (o >= L) o -= L;
-    g.p.setAttribute("startOffset", o.toFixed(1));
-    g.t.style.opacity = a.toFixed(3);
-  });
   // Logo bleibt beim Hover ruhig
 
   // Phase 2 beginnt: Text & Logo lösen sich auf
@@ -481,130 +480,167 @@ function updateOrbit(dt) {
   orbitSvg.style.opacity = fade.toFixed(3);
   const vis = fade > .004 ? "" : "hidden";               // ganz ausgeblendet → aus dem Rendering nehmen
   if (orbitSvg.style.visibility !== vis) orbitSvg.style.visibility = vis;
-  heroLogo.style.opacity = (ALT ? 1 - smooth(.05, .6, m2) : 1 - smooth(.05, .7, clamp(sc))).toFixed(3);   // Logo verschwindet früh
+  heroLogo.style.opacity = (1 - smooth(.05, .7, clamp(sc))).toFixed(3);
+  // Scroll-Hinweis: verschwindet, sobald gescrollt wird
+  const hintA = (1 - smooth(0, .06, SCY / Math.max(1, H))).toFixed(3);
+  if (heroScroll._a !== hintA) { heroScroll._a = hintA; heroScroll.style.opacity = hintA; heroScroll.style.pointerEvents = +hintA < .3 ? "none" : ""; }   // Logo verschwindet früh
   orbit.style.pointerEvents = fade < .5 ? "none" : "";
 }
-function orbitRect() {
+// Geometrie-Cache: alles, was sich beim Scrollen nicht verändert, wird nur bei Größenänderungen gemessen
+// (in Dokument-Koordinaten). Im Frame wird daraus nur noch gerechnet – kein Messen, kein erzwungenes Layout.
+const GEO = { ok: false };
+function cacheGeo() {
+  const sy = scrollY;
+  const dr = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top + sy, width: r.width, height: r.height }; };
+  GEO.circles = circleSlots.map(dr); GEO.pills = pillSlots.map(dr);
+  GEO.body = dr(leistBody); GEO.foot = dr(footStrip);
+  GEO.navBottom = nav.getBoundingClientRect().bottom; GEO.brandBottom = navBrand.getBoundingClientRect().bottom;
   const o = orbit.getBoundingClientRect();
-  const sc = o.width / 480;
-  const R = orbitState.r * sc;
+  GEO.orbit = { left: o.left, top: o.top + sy - orbitPush, width: o.width, height: o.height };
+  GEO.ok = true;
+}
+const vr = (g) => ({ left: g.left, top: g.top - SCY, width: g.width, height: g.height, right: g.left + g.width, bottom: g.top - SCY + g.height });
+function orbitRect() {
+  const o = vr(GEO.orbit); o.top += orbitPush;
+  const sc = o.width / 480, R = orbitState.r * sc;
   const cx = o.left + o.width / 2, cy = o.top + o.height / 2;
   return { left: cx - R, top: cy - R, width: 2 * R, height: 2 * R };
 }
 
 /* =========================================================
-   5. SMOOTH SCROLL (Lenis, falls geladen)
+   5. SCROLLEN
+   Desktop: Rad/Trackpad scrollen nativ; wenn die Bewegung steht, gleitet die Seite in den Abschnitt.
+   Handy: Der Finger bewegt die Seite direkt (1:1). Beim Loslassen gibt es keinen langen nativen Schwung,
+   der über mehrere Abschnitte schießt – die Seite gleitet höchstens einen Abschnitt weiter und
+   übernimmt dabei die Geschwindigkeit des Fingers. In hohen Abschnitten läuft ein kurzer, weicher Schwung.
    ========================================================= */
-let lenis = null;
-/* Magnetische Screens: nach dem Scrollen gleitet die Seite zum nächsten Abschnitt */
 // Verlauf sicher ändern (in eingebetteten Vorschauen kann das gesperrt sein)
 const hist = (m, ...a) => { try { history[m](...a); } catch (e) {} };
-const SNAP = { lastInput: 0, busy: false, down: false, pts: [], secs: [], startY: 0, cool: 0 };
-const markInput = () => {
-  const now = performance.now();
-  if (now - SNAP.lastInput > 220) SNAP.startY = scrollY;   // neue Geste: Startpunkt merken
-  SNAP.lastInput = now; SNAP.busy = false;
+const lockScroll = (on) => document.documentElement.classList.toggle("no-scroll", on);
+const SNAP = { pts: [], free: [], from: 0, to: 0, t0: 0, dur: 0, m0: 0, on: false, timer: 0, rest: 0 };
+const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - VH);
+const easeGlide = (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;   // easeInOutCubic
+// mit Schwung: Hermite-Kurve (Startsteigung = Geschwindigkeit beim Loslassen, weich bis zum Stillstand)
+const glideCurve = (u, m0) => m0 > 0 ? (u * u * u - 2 * u * u + u) * m0 + (3 * u * u - 2 * u * u * u) : easeGlide(u);
+function glideTo(y, { minDur = 0, v0 = 0, dur = 0, m0min = 0 } = {}) {
+  SNAP.from = scrollY; SNAP.to = clamp(Math.round(y), 0, maxScroll());
+  const dist = SNAP.to - SNAP.from, d = Math.abs(dist);
+  if (d < 1) { SNAP.on = false; SNAP.rest = SNAP.to; return; }
+  // Dauer: Desktop ~0,8 s, Handy ~1 s für einen ganzen Bildschirm
+  SNAP.dur = dur || Math.max(minDur, TOUCHUI ? 560 + 430 * Math.min(1.6, d / VH) : 480 + 330 * Math.min(1.6, d / VH));
+  SNAP.m0 = clamp(Math.max(v0 * SNAP.dur / dist, m0min), 0, 2.2);
+  SNAP.t0 = performance.now(); SNAP.on = true;
+}
+function stepScroll(now) {          // läuft am Anfang jedes Frames, vor dem Lesen von scrollY – genau ein Schreibzugriff pro Bild
+  if (TOUCH.drag) { if (TOUCH.want !== TOUCH.wrote) { TOUCH.wrote = TOUCH.want; window.scrollTo(0, TOUCH.want); } return; }
+  if (!SNAP.on) return;
+  const t = Math.min(1, (now - SNAP.t0) / SNAP.dur);
+  window.scrollTo(0, Math.round(SNAP.from + (SNAP.to - SNAP.from) * glideCurve(t, SNAP.m0)));
+  if (t >= 1) { SNAP.on = false; SNAP.rest = SNAP.to; }
+}
+const stopGlide = () => { SNAP.on = false; };
+const scrollToY = (y, { immediate = false } = {}) => {
+  if (immediate) { stopGlide(); window.scrollTo(0, y); SNAP.rest = y; } else glideTo(y, { minDur: TOUCHUI ? 800 : 650 });
 };
-/* Seitenwechsel: die erste bewusste Rad-/Trackpad-Bewegung löst sofort das Gleiten zum nächsten Screen aus.
-   Der Rest der Geste (Nachlauf) wird geschluckt. In Abschnitten, die höher als der Bildschirm sind, scrollt man frei. */
-const PAGING = false;
-const PAGE = { acc: 0, last: 0, locked: false, done: true, lastAbs: 0 };
+function snapPoints() {             // Abschnittsanfänge; Abschnitte höher als der Bildschirm sind innen frei scrollbar
+  const max = maxScroll(), pts = [], free = [];
+  for (const s of [$(".hero"), ...navSecs]) {
+    const top = docTop(s), h = s.offsetHeight;
+    if (s.id === "kontakt") { pts.push(max); continue; }
+    pts.push(Math.min(top, max));
+    if (h > VH + 4) { pts.push(Math.min(top + h - VH, max)); free.push([top, top + h - VH]); }
+  }
+  SNAP.pts = [...new Set(pts.map(Math.round))].sort((a, b) => a - b); SNAP.free = free;
+}
+const inFree = (y) => SNAP.free.find(([a, b]) => y > a + 2 && y < b - 2);
+const nextPt = (y, dir) => dir > 0 ? SNAP.pts.find((p) => p > y + 1) : [...SNAP.pts].reverse().find((p) => p < y - 1);
+const nearPt = (y) => SNAP.pts.reduce((a, b) => Math.abs(b - y) < Math.abs(a - y) ? b : a, 0);
+const scrollLocked = () => POV.open || document.documentElement.classList.contains("no-scroll");
+
+/* ---------- Desktop: Rad / Trackpad / Tasten (nativ) ---------- */
+function settle() {
+  SNAP.timer = 0;
+  if (TOUCH.drag || SNAP.on || scrollLocked() || !SNAP.pts.length) return;
+  const y = scrollY;
+  if (inFree(y)) { SNAP.rest = y; return; }
+  const moved = y - SNAP.rest;
+  let target = nearPt(y);
+  // Richtung zählt: wer bewusst ein Stück weiterscrollt, kommt zum nächsten Abschnitt
+  if (Math.abs(target - SNAP.rest) < 2 && Math.abs(moved) > Math.min(70, VH * .07)) {
+    const n = nextPt(y, Math.sign(moved)); if (n !== undefined) target = n;
+  }
+  glideTo(target);
+}
+addEventListener("scroll", () => {
+  if (SNAP.on || TOUCH.drag) return;   // eigenes Gleiten/Ziehen – abgebrochen wird nur durch echte Eingaben
+  clearTimeout(SNAP.timer); SNAP.timer = setTimeout(settle, 80);
+}, { passive: true });
+addEventListener("pointerdown", (e) => { if (SNAP.on && e.pointerType === "mouse" && e.target === document.documentElement) stopGlide(); }, { passive: true });
+let lastWheel = 0, lastWheelAbs = 0;
 addEventListener("wheel", (e) => {
-  const now = performance.now();
-  const gap = now - PAGE.last; PAGE.last = now;
-  if (!PAGING) {                       // v16: kein automatisches Weiterblättern mehr – man scrollt selbst,
-    if (Math.abs(e.deltaY) > 1) markInput();   // eingerastet wird erst nach dem Loslassen
-    return;
+  const a = Math.abs(e.deltaY), now = performance.now();
+  if (SNAP.on) {
+    // auslaufender Trackpad-Schwung (kleiner werdende Werte) wird geschluckt, neuer Schub bricht das Gleiten ab
+    if (a <= lastWheelAbs * 1.15 + 2 && now - lastWheel < 120) { if (!e.defaultPrevented) e.preventDefault(); }
+    else stopGlide();
   }
-  if (window.__nosnap || POV.open || !$("#player").hidden || !SNAP.pts.length) return;
-  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;             // horizontal → Karten
-  const dir = Math.sign(e.deltaY), abs = Math.abs(e.deltaY);
-  // neuer Impuls = nach einer Pause oder deutlich stärker als das vorige Ereignis (Nachlauf wird nur schwächer)
-  const fresh = gap > 260 || abs > PAGE.lastAbs * 1.35 + 4;
-  PAGE.lastAbs = abs;
-  if (PAGE.locked || (!PAGE.done) || (PAGE.tail && !fresh)) { e._pp = true; e.preventDefault(); return; }    // läuft gerade / Nachlauf
-  PAGE.tail = false;
-  const y = lenis ? lenis.targetScroll : scrollY;
-  const free = SNAP.secs.some((s) => s.bottom - s.top > VH + 40 &&
-    (dir > 0 ? y >= s.top - 2 && y < s.bottom - VH - 2 : y > s.top + 2 && y <= s.bottom - VH + 2));
-  if (free) { markInput(); return; }                                  // freier Bereich: normal scrollen
-  e._pp = true; e.preventDefault();
-  if (gap > 180) PAGE.acc = 0;
-  PAGE.acc += e.deltaY;
-  if (Math.abs(PAGE.acc) < 25) return;                                // winziges Zucken ignorieren
-  const ahead = SNAP.pts.filter((q) => (dir > 0 ? q > y + 2 : q < y - 2)).sort((a, b) => dir * (a - b));
-  if (!ahead.length) return;
-  const target = ahead[0];
-  PAGE.locked = true; PAGE.done = false; PAGE.acc = 0;
-  SNAP.busy = true; SNAP.startY = target;
-  const fin = () => { PAGE.done = true; SNAP.busy = false; SNAP.cool = performance.now() + 200; };
-  if (lenis) lenis.scrollTo(target, { duration: .85, easing: (t) => 1 - Math.pow(1 - t, 4), onComplete: fin });
-  else { window.scrollTo({ top: target, behavior: "smooth" }); setTimeout(fin, 850); }
+  lastWheel = now; lastWheelAbs = a;
 }, { passive: false });
-function updatePage() {   // nach der Fahrt entsperren; ein noch laufender Nachlauf bleibt geschluckt (PAGE.tail)
-  if (PAGE.locked && PAGE.done) { PAGE.locked = false; PAGE.tail = performance.now() - PAGE.last < 120; }
-  if (PAGE.tail && performance.now() - PAGE.last > 260) PAGE.tail = false;
-}
-["touchmove", "keydown"].forEach((ev) => addEventListener(ev, markInput, { passive: true }));
-addEventListener("scroll", () => { if (!SNAP.busy) SNAP.lastInput = performance.now(); }, { passive: true });
-addEventListener("pointerdown", () => (SNAP.down = true), { passive: true });
-addEventListener("pointerup", () => { SNAP.down = false; SNAP.lastInput = performance.now(); }, { passive: true });
-addEventListener("touchstart", () => (SNAP.down = true), { passive: true });
-addEventListener("touchend", () => { SNAP.down = false; SNAP.lastInput = performance.now(); }, { passive: true });
-addEventListener("touchstart", () => (SNAP.touch = true), { passive: true });
-addEventListener("wheel", () => (SNAP.touch = false), { passive: true });
-function cacheSnaps() {
-  const els = [".hero", "#leistungen", "#arbeiten", "#ueber", "#kontakt"].map((s) => $(s));
-  SNAP.secs = els.map((e) => { const t = docTop(e); return { top: t, bottom: t + e.offsetHeight }; });
-  SNAP.pts = SNAP.secs.map((s) => s.top);
-  SNAP.pts[SNAP.pts.length - 1] = Math.max(0, document.documentElement.scrollHeight - VH);
-}
-function updateSnap() {
-  if (window.__nosnap || PAGE.locked || POV.open || SNAP.down || (typeof drag !== "undefined" && drag.down) || !$("#player").hidden || !SNAP.pts.length) return;
-  const now = performance.now();
-  if (SNAP.busy || now - SNAP.lastInput < (lenis ? 32 : 70)) return;   // greift schneller
-  const y = lenis ? lenis.targetScroll : SCY;     // dorthin, wo die Bewegung gerade hinläuft – nicht erst warten
-  // in einem Abschnitt, der höher als der Bildschirm ist, frei scrollen lassen
-  if (SNAP.secs.some((s) => s.bottom - s.top > VH + 40 && y > s.top + 2 && y < s.bottom - VH - 2)) return;
-  let p = SNAP.pts.reduce((b, q) => (Math.abs(q - y) < Math.abs(b - y) ? q : b), SNAP.pts[0]);
-  // deutlich angeschoben (> 30 % Bildschirm)? → in diese Richtung zum nächsten Abschnitt
-  const moved = y - SNAP.startY;
-  if (Math.abs(moved) > VH * .18 && Math.abs(moved) < VH * .95) {   // nur echtes Anschieben innerhalb eines Screens
-    const dir = Math.sign(moved);
-    const ahead = SNAP.pts.filter((q) => dir > 0 ? q > SNAP.startY + 2 : q < SNAP.startY - 2).sort((a, b) => dir * (a - b));
-    if (ahead.length) p = ahead[0];
-  }
-  const d = Math.abs(p - y);
-  if (d < 1.5 || d > VH * 1.05) return;
-  SNAP.busy = true;
-  // Touch: Schwung ist schon ausgelaufen → weich anfahren und weich ankommen, etwas länger (Kreise haben Zeit zum Teilen)
-  const dur = SNAP.touch ? .5 + Math.min(.35, Math.abs(p - SCY) / VH * .55) : .26 + Math.min(.22, Math.abs(p - SCY) / VH * .4);
-  const ease = SNAP.touch ? (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 : (t) => 1 - Math.pow(1 - t, 3);
-  if (lenis) lenis.scrollTo(p, { duration: dur, easing: ease, onComplete: () => { SNAP.busy = false; SNAP.cool = performance.now() + 350; SNAP.startY = SCY; } });
-  else { window.scrollTo({ top: p, behavior: "smooth" }); setTimeout(() => (SNAP.busy = false), dur * 1000); }
-}
-/* Magnetische Screens: nahe an einem Screen wird das Scrollen „zäh",
-   und wenn man loslässt, rastet die Seite weich ein. */
-function initLenis() {
-  if (!window.Lenis || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  lenis = new window.Lenis({
-    lerp: .1, smoothWheel: true, gestureOrientation: "vertical",
-    // während des Einrastens kleinen Nachlauf ignorieren, bewusstes Weiterscrollen geht durch
-    virtualScroll: (data) => {
-      if (data.event && data.event._pp) return false;                 // vom Seitenwechsel übernommen
-      if ((SNAP.busy || performance.now() < SNAP.cool) && Math.abs(data.deltaY) <= 24) return false;
-      // über den Karten: vertikal etwas schwerer, Schräg-Anteile deutlich gebremst → kein Mitzittern
-      if (data.event && data.event.target && data.event.target.closest && data.event.target.closest("#trackWrap")) {
-        const diag = Math.abs(data.deltaX) > Math.abs(data.deltaY) * .35;
-        data.deltaY *= diag ? .25 : .6;
-      }
-      return true;
+addEventListener("keydown", (e) => { if (SNAP.on && /^(Arrow|Page|Home|End| )/.test(e.key)) stopGlide(); });
+
+/* ---------- Handy: Finger ---------- */
+const TOUCHUI = matchMedia("(pointer: coarse)").matches;
+const TOUCH = { on: false, drag: false, axis: 0, x0: 0, y0: 0, s0: 0, want: 0, wrote: -1, track: false, hist: [] };
+const SKIP_TOUCH = ".w98, .rp-vol, .dots, .pov, .lb, input, textarea, select";
+if (TOUCHUI) {
+  addEventListener("touchstart", (e) => {
+    TOUCH.on = false; TOUCH.drag = false;
+    if (e.touches.length !== 1 || scrollLocked() || e.target.closest(SKIP_TOUCH)) return;
+    const t = e.touches[0];
+    stopGlide(); clearTimeout(SNAP.timer);
+    Object.assign(TOUCH, { on: true, axis: 0, x0: t.clientX, y0: t.clientY, s0: scrollY, want: scrollY, wrote: -1,
+      track: !!e.target.closest("#trackWrap"), hist: [[performance.now(), scrollY]] });
+  }, { passive: true });
+  addEventListener("touchmove", (e) => {
+    if (!TOUCH.on) return;
+    if (e.touches.length !== 1) { TOUCH.on = TOUCH.drag = false; return; }   // Zoomen mit zwei Fingern bleibt nativ
+    const t = e.touches[0], dx = t.clientX - TOUCH.x0, dy = t.clientY - TOUCH.y0;
+    if (!TOUCH.axis) {
+      // Auf der Kartenreihe erst die Richtung abwarten (waagerecht = Karten wischen, nativ)
+      if (TOUCH.track && Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
+      TOUCH.axis = TOUCH.track && Math.abs(dx) > Math.abs(dy) ? 2 : 1;
+      if (TOUCH.axis === 1) TOUCH.drag = true;
     }
-  });
-}
-function scrollToY(y, opts = {}) {
-  if (lenis) lenis.scrollTo(y, { duration: opts.duration ?? 1.6, easing: (t) => 1 - Math.pow(1 - t, 4), immediate: !!opts.immediate });
-  else window.scrollTo({ top: y, behavior: opts.immediate ? "auto" : "smooth" });
+    if (TOUCH.axis !== 1) return;
+    if (e.cancelable) e.preventDefault();
+    TOUCH.want = Math.round(clamp(TOUCH.s0 - dy, 0, maxScroll()));
+    const now = performance.now(), H = TOUCH.hist; H.push([now, TOUCH.want]);
+    while (H.length > 2 && now - H[0][0] > 90) H.shift();
+  }, { passive: false });
+  const release = () => {
+    if (!TOUCH.on) return;
+    const wasDrag = TOUCH.drag; TOUCH.on = TOUCH.drag = false;
+    if (!wasDrag || scrollLocked() || !SNAP.pts.length) return;
+    // Geschwindigkeit der letzten ~90 ms (px/ms, positiv = nach unten)
+    const H = TOUCH.hist, now = performance.now(), [t0, y0] = H[0];
+    let v = now - H[H.length - 1][0] > 70 ? 0 : (TOUCH.want - y0) / Math.max(16, now - t0);
+    v = clamp(v, -4, 4);
+    const y = TOUCH.want, zone = inFree(y);
+    // im hohen Abschnitt: kurzer, natürlicher Schwung (bremst gleichmäßig ab)
+    if (zone && Math.abs(v) > .08) {
+      const proj = y + v * 300;
+      if (proj > zone[0] && proj < zone[1]) { const d = Math.abs(proj - y); glideTo(proj, { v0: v, dur: clamp(2 * d / Math.abs(v), 250, 900) }); return; }
+      const end = v > 0 ? zone[1] : zone[0]; glideTo(end, { v0: v }); return;
+    }
+    if (zone) { SNAP.rest = y; return; }
+    // sonst: höchstens ein Abschnitt weiter – Richtung aus Schwung oder Strecke
+    const moved = y - TOUCH.s0, dir = Math.abs(v) > .25 ? Math.sign(v) : Math.abs(moved) > Math.min(70, VH * .08) ? Math.sign(moved) : 0;
+    let target = dir ? nextPt(y, dir) : nearPt(y);
+    if (target === undefined) target = nearPt(y);
+    glideTo(target, { v0: Math.sign(target - y) === Math.sign(v) ? v : 0, m0min: .6 });   // ohne zähen Anlauf
+  };
+  addEventListener("touchend", (e) => { if (!e.touches.length) release(); }, { passive: true });
+  addEventListener("touchcancel", release, { passive: true });
 }
 const docTop = (el) => el.getBoundingClientRect().top + scrollY;
 
@@ -612,13 +648,12 @@ const docTop = (el) => el.getBoundingClientRect().top + scrollY;
    6. NAV (ohne Hintergrund)
    ========================================================= */
 const nav = $("#nav"), navBrand = $("#navBrand");
-$("#navBrand").addEventListener("click", (e) => { e.preventDefault(); if (POV.open) { closeProject({ fromHistory: true }); hist("replaceState", null, "", location.pathname); } SNAP.busy = true; SNAP.startY = 0; setTimeout(() => { SNAP.busy = false; SNAP.startY = 0; }, 2100); scrollToY(0, { duration: 2 }); });
+$("#navBrand").addEventListener("click", (e) => { e.preventDefault(); if (POV.open) { closeProject({ fromHistory: true }); hist("replaceState", null, "", location.pathname); } scrollToY(0); });
 $$(".nav__links a, .nav__icons a").forEach((a) => a.addEventListener("click", (e) => {
   e.preventDefault();
   if (POV.open) { POV.open = true; closeProject({ fromHistory: true }); hist("replaceState", null, "", location.pathname); }
   const t = $(a.getAttribute("href"));
   const y = t.id === "kontakt" ? document.documentElement.scrollHeight - VH : docTop(t);
-  SNAP.busy = true; SNAP.startY = y; setTimeout(() => { SNAP.busy = false; SNAP.startY = y; }, 1700);
   scrollToY(y);
 }));
 const navSecs = ["leistungen", "arbeiten", "ueber", "kontakt"].map((id) => $("#" + id));
@@ -626,9 +661,10 @@ let navTops = [], navCut = -1;
 const navLinks = $$(".nav__links a, .nav__icons a");
 let WORK_TOP = 0, WORK_H = 0;
 function cacheNav() {
-  navTops = navSecs.map((s) => docTop(s)); cacheSnaps(); if (typeof layoutDots === "function") layoutDots();
+  navTops = navSecs.map((s) => docTop(s)); snapPoints(); if (typeof layoutDots === "function") layoutDots();
   if (typeof trackWrap !== "undefined") { WORK_TOP = docTop(trackWrap); WORK_H = trackWrap.offsetHeight; }
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
+  cacheGeo();
 }
 // statt jede Sekunde nachzumessen (kurzer Ruckler): nur wenn sich die Seitenhöhe wirklich ändert
 let cacheQ = 0;
@@ -683,14 +719,13 @@ renderService(activeService, true); shownService = activeService;
 /* =========================================================
    9. CHIPS · Pille → Kreis → 5 Kreise → 5 Pillen (liquid)
    ========================================================= */
-const chipsLayer = $("#chips"), goo = $("#goo"), gooG = $("#gooG");
+const chipsLayer = $("#chips");
 /* Flüssige Kontur (Metaballs) auf der Grafikkarte – gleicher Look wie der frühere SVG-Filter, aber ohne Ruckeln */
 const GooGL = (() => {
   const cv = document.createElement("canvas");
   cv.className = "goo-gl"; chipsLayer.insertBefore(cv, chipsLayer.firstChild);
   const gl = cv.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: false });
   if (!gl) return null;
-  goo.style.display = "none";
   const vs = "attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }";
   const fs = `precision mediump float;
     uniform vec3 uC[5]; uniform vec2 uB[5]; uniform vec2 uS[5]; uniform int uN; uniform float uK; uniform float uW; uniform vec2 uRes;
@@ -720,23 +755,38 @@ const GooGL = (() => {
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   const U = {}; ["uC", "uB", "uS", "uN", "uK", "uW", "uRes"].forEach((n) => (U[n] = gl.getUniformLocation(pr, n)));
   const C = new Float32Array(15), B = new Float32Array(10), S = new Float32Array(10);
-  let shown = false;
+  let shown = false, lastKey = "";
   return {
-    draw(list) {
-      if (!list.length) { if (shown) { cv.style.display = "none"; shown = false; } return; }
+    draw(list, docY) {
+      if (!list.length) { if (shown) { cv.style.display = "none"; shown = false; lastKey = ""; } return; }
       if (!shown) { cv.style.display = "block"; shown = true; }
+      // Die Ebene liegt im Dokument und wird pro Bild an die Scrollposition geschoben (statt position: fixed):
+      // so scrollt sie zwischen zwei Bildern zusammen mit Kreisen und Text – am Handy hinkt die Kontur nicht mehr hinterher
+      const ty = Math.round(docY); if (cv._ty !== ty) { cv._ty = ty; cv.style.transform = `translate3d(0, ${ty}px, 0)`; }
+      if (cv._h !== VH) { cv._h = VH; cv.style.height = VH + "px"; }
       // echte Größe der Ebene (ohne Scrollbalken) – sonst ist die Kontur gegenüber den Kreisen seitlich verschoben
-      const dpr = Math.min(devicePixelRatio || 1, 2), cw = cv.clientWidth || chipsLayer.clientWidth, ch = cv.clientHeight || chipsLayer.clientHeight;
+      const dpr = Math.min(devicePixelRatio || 1, 2), cw = cv.clientWidth || chipsLayer.clientWidth, ch = VH;
       const w = Math.round(cw * dpr), h = Math.round(ch * dpr), sx = w / cw, sy = h / ch;
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
       for (let i = 0; i < 5; i++) {
         const b = list[i] || { x: -1e4, y: -1e4, r: 1, hw: 1, hh: 1, sx: 1, sy: 1 };
         C[i * 3] = b.x * sx; C[i * 3 + 1] = b.y * sy; C[i * 3 + 2] = b.r * dpr; B[i * 2] = (b.hw ?? b.r) * dpr; B[i * 2 + 1] = (b.hh ?? b.r) * dpr; S[i * 2] = b.sx; S[i * 2 + 1] = b.sy;
       }
+      // nur neu zeichnen, wenn sich etwas bewegt hat; und nur im Rechteck um die Formen (spart am Handy viel Grafikleistung)
+      const key = C.join() + B.join() + S.join() + list.length + w + h;
+      if (key === lastKey) return; lastKey = key;
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (let i = 0; i < Math.min(5, list.length); i++) {
+        const ex = B[i * 2] * Math.max(1, S[i * 2]) + 40 * dpr, ey = B[i * 2 + 1] * Math.max(1, S[i * 2 + 1]) + 40 * dpr;
+        x0 = Math.min(x0, C[i * 3] - ex); x1 = Math.max(x1, C[i * 3] + ex); y0 = Math.min(y0, C[i * 3 + 1] - ey); y1 = Math.max(y1, C[i * 3 + 1] + ey);
+      }
       gl.viewport(0, 0, w, h);
       gl.uniform3fv(U.uC, C); gl.uniform2fv(U.uB, B); gl.uniform2fv(U.uS, S); gl.uniform1i(U.uN, Math.min(5, list.length));
       gl.uniform1f(U.uK, 20 * dpr); gl.uniform1f(U.uW, 1. * dpr); gl.uniform2f(U.uRes, w, h);
-      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.disable(gl.SCISSOR_TEST); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      const sx0 = clamp(Math.floor(x0), 0, w), sx1 = clamp(Math.ceil(x1), 0, w), sy0 = clamp(Math.floor(h - y1), 0, h), sy1 = clamp(Math.ceil(h - y0), 0, h);
+      if (sx1 <= sx0 || sy1 <= sy0) return;
+      gl.enable(gl.SCISSOR_TEST); gl.scissor(sx0, sy0, sx1 - sx0, sy1 - sy0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };
@@ -745,23 +795,21 @@ const circleSlots = $$("#slotCircles .slot"), pillSlots = $$("#slotPills .slot")
 const filters = new Set();
 const SVGNS = "http://www.w3.org/2000/svg";
 // Bei jedem Laden andere Reihenfolge und Geschwindigkeiten für die Zellteilung
-const SPLIT = CATS.map(() => ({ delay: Math.random() * .3, k: 150 + Math.random() * 130 }));
+const SPLIT = CATS.map(() => ({ delay: Math.random() * .12, k: 300 + Math.random() * 140 }));
 let splitArmed = true;
 function reshuffleSplit() {
   SPLIT.forEach((s, i) => {
-    s.delay = Math.random() * .3; s.k = 150 + Math.random() * 130;
+    s.delay = Math.random() * .12; s.k = 300 + Math.random() * 140;   // schnell, kurze Versätze
     const sp = chips[i] && chips[i].s2;
-    if (sp) { sp.k = s.k; sp.c = 2 * Math.sqrt(s.k) * (.72 + Math.random() * .16); }
+    if (sp) { sp.k = s.k; sp.c = 2 * Math.sqrt(s.k); }   // kritisch gedämpft: kommt an, ohne nachzuwackeln
   });
 }
 const chips = CATS.map((cat, i) => {
   const el = document.createElement("button");
-  el.type = "button"; el.className = "chip"; el.dataset.cat = cat;
+  el.type = "button"; el.className = "chip is-hidden";   // unsichtbar, bis die Position berechnet ist el.dataset.cat = cat;
   el.innerHTML = `<span class="chip__fill"></span><span class="chip__label">${cat}</span>`;
   chipsLayer.appendChild(el);
-  const blob = document.createElementNS(SVGNS, "rect");
-  gooG.appendChild(blob);
-  const c = { el, cat, i, blob, label: el.lastElementChild, s2: ALT ? new Spring(170, 22) : new Spring(SPLIT[i].k, 2 * Math.sqrt(SPLIT[i].k) * (.72 + Math.random() * .16)), s3: new Spring(230, 28), last: "" };
+  const c = { el, cat, i, label: el.lastElementChild, s2: new Spring(SPLIT[i].k, 2 * Math.sqrt(SPLIT[i].k)), s3: new Spring(380, 2 * Math.sqrt(380)), last: "" };
   el.addEventListener("pointerenter", () => { if (c.mode === "circle") setService(cat); });
   el.addEventListener("click", () => { if (c.mode === "pill") toggleFilter(cat); else if (c.mode === "circle") setService(cat); });
   return c;
@@ -780,37 +828,25 @@ let scrollDir = 1, lastScrollY = 0, orbitPush = 0;
 function updateChips(dt) {
   if (SCY !== lastScrollY) { scrollDir = SCY < lastScrollY ? -1 : 1; lastScrollY = SCY; }
   const H = HERO_H || (HERO_H = heroEl.offsetHeight);
-  const c0 = circleSlots[0].getBoundingClientRect();
+  if (!GEO.ok) cacheGeo();
+  const c0 = vr(GEO.circles[0]);
   const circleDoc = c0.top + SCY + c0.height / 2;
-  const p0 = pillSlots[0].getBoundingClientRect();
+  const p0 = vr(GEO.pills[0]);
   // alle Messungen vor dem ersten Schreibzugriff (sonst erzwingt jede Messung ein neues Layout)
-  const As = circleSlots.map((s) => s.getBoundingClientRect()), Bs = pillSlots.map((s) => s.getBoundingClientRect());
-  const bodyTop = leistBody.getBoundingClientRect().top;
+  const As = GEO.circles.map(vr), Bs = GEO.pills.map(vr);
+  const bodyTop = GEO.body.top - SCY;
   const pillDoc = p0.top + SCY + p0.height / 2;
 
   // Nav-Linie als „Schieber": Abstand Linie→Kreis ≥ halber Abstand Navtext→Linie
-  const navR = nav.getBoundingClientRect(), brandR = navBrand.getBoundingClientRect();
-  const lineY = navR.bottom, pushY = lineY + Math.max(12, (lineY - brandR.bottom) * .6);
+  const lineY = GEO.navBottom, pushY = lineY + Math.max(12, (lineY - GEO.brandBottom) * .6);
   // Phase 2: der Laufschrift-Kreis klebt an der Linie, wird geschoben und teilt sich in 5
   const Oraw = orbitRect(); Oraw.top -= orbitPush;
-  let altP0 = null, altHeroBottom = 0;
-  if (!ALT) {
-    const pushed1 = Math.max(0, pushY - Oraw.top);
-    splitP = clamp(pushed1 / Math.max(140, VH * .23));
-    // jedes Mal, wenn der Kreis wieder ganz zusammen ist: neue Reihenfolge und neue Tempi
-    if (splitP === 0 && !splitArmed && chips.every((c) => c.s2.rest(0))) { reshuffleSplit(); splitArmed = true; }
-    if (splitP > 0) splitArmed = false;
-    if (Math.abs(pushed1 - orbitPush) > .1) { orbitPush = pushed1; orbit.style.transform = `translate(-50%, calc(-50% + ${pushed1.toFixed(1)}px))`; }
-  } else {
-    // Alternative: die Pille bleibt im Hero, schnürt sich zu 5 Tropfen ein (groß · klein · winzig · klein · groß)
-    const s0 = H * .12, s1 = Math.max(s0 + 240, circleDoc - VH * .5);
-    splitP = clamp((SCY - s0) / (s1 - s0));
-    const ob = orbit.getBoundingClientRect(), k = ob.width / 480;
-    const D = 2 * PILL.r * k, W = 2 * (PILL.hw + PILL.r) * k, cx = ob.left + ob.width / 2, cy = ob.top + ob.height / 2;
-    const gap = (W - D) / 4;
-    altP0 = CATS.map((_, i) => ({ left: cx + (i - 2) * gap - D / 2, top: cy - D / 2, width: D, height: D }));
-    altHeroBottom = H - SCY;
-  }
+  const pushed1 = Math.max(0, pushY - Oraw.top);
+  splitP = clamp(pushed1 / Math.max(140, VH * .23));
+  // jedes Mal, wenn der Kreis wieder ganz zusammen ist: neue Reihenfolge und neue Tempi
+  if (splitP === 0 && !splitArmed && chips.every((c) => c.s2.rest(0))) { reshuffleSplit(); splitArmed = true; }
+  if (splitP > 0) splitArmed = false;
+  if (Math.abs(pushed1 - orbitPush) > .1) { orbitPush = pushed1; orbit.style.transform = `translate(-50%, calc(-50% + ${pushed1.toFixed(1)}px))`; }
   // Phase 3: Kreise → Pillen
   const c0top = c0.top;                                     // Oberkante der Kreise (Viewport)
   const pushed = Math.max(0, pushY - c0top);                // wie weit die Linie schon „drückt"
@@ -822,26 +858,17 @@ function updateChips(dt) {
   if (Math.abs(bodyA - (leistBody._a ?? 1)) > .003) { leistBody._a = bodyA; leistBody.style.opacity = bodyA.toFixed(3); }
   const st = .05, span = 1 - st * 4;
   const st3 = .035, span3 = 1 - st3 * 4;
-  let anyGoo = false;
   const blobs = [];
   const SY = SCY;   // Kreise/Pillen werden in Dokument-Koordinaten gesetzt
   for (const c of chips) {
     // Reihenfolge: mittlerer Kreis zuerst, dann nach außen (wie eine Zellteilung)
-    const t2 = ALT ? clamp((splitP - [0, .025, .05, .025, 0][c.i]) / .95)   // außen zuerst – wie Tropfen, die abreißen
-                   : clamp((splitP - SPLIT[c.i].delay) / .7);  // zufällige Verzögerung je Kreis
+    const t2 = clamp((splitP - SPLIT[c.i].delay) / .7);  // zufällige Verzögerung je Kreis
     const t3 = clamp((p3 - c.i * st3) / span3);          // linear – die Feder sorgt für das Auslaufen
     const e2 = c.s2.step(t2, dt), e3 = c.s3.step(t3, dt);
     const A = As[c.i], B = Bs[c.i];
     // geschobene Kreisposition: nie über der Linie
     const Ap = { left: A.left, top: Math.max(A.top, pushY), width: A.width, height: A.height };
-    let R;
-    if (ALT) {
-      const SZ = [1, .55, .3, .55, 1][c.i], d1 = A.width * SZ;
-      const P1 = { left: A.left + A.width / 2 - d1 / 2, top: altHeroBottom - d1 / 2, width: d1, height: d1 };
-      const tgt = e3 > 0 || pushed > 0 ? Ap : A;
-      if (e2 <= .5) R = lerpRect(altP0[c.i], P1, easeIO(clamp(e2 / .5)));
-      else { const t = (e2 - .5) / .5; R = lerpRect(P1, tgt, t <= 1 ? easeIO(t) : t); }
-    } else R = lerpRect(O, e3 > 0 || pushed > 0 ? Ap : A, e2);
+    let R = lerpRect(O, e3 > 0 || pushed > 0 ? Ap : A, e2);
     R = lerpRect(R, B, e3);
     R.width = Math.max(10, R.width); R.height = Math.max(10, R.height);
 
@@ -856,7 +883,7 @@ function updateChips(dt) {
     const dir2x = A.left - O.left, dir2y = A.top - O.top, dir3x = B.left - A.left, dir3y = B.top - A.top;
     const vx = c.s2.v * dir2x, vy = c.s2.v * dir2y;
     const speed = Math.hypot(vx, vy);
-    const str = ALT ? 0 : clamp(speed * .00009, 0, .18);
+    const str = clamp(speed * .00009, 0, .18);
     const ang = Math.atan2(vy, vx) * 180 / Math.PI;
     const sx = 1 + str, sy = 1 - str * .55;
 
@@ -874,30 +901,30 @@ function updateChips(dt) {
         c.el.style.width = R.width.toFixed(2) + "px"; c.el.style.height = R.height.toFixed(2) + "px";
       }
       c.el.classList.toggle("is-hidden", !visible);
-      c.el.classList.toggle("is-flying", flying);
+      c.el.classList.toggle("is-flying", flying && !!GooGL);   // ohne WebGL: normale Konturen statt weicher Form
       c.el.classList.toggle("is-pill", c.mode === "pill");
       c.el.classList.toggle("is-on", on);
       c.label.style.opacity = lab.toFixed(3);
-      c.el.style.fontSize = Math.min(lerp(20, 18, e3), R.width / lerp(5.6, VW < 600 ? 5.1 : 6.6, clamp(e3))).toFixed(1) + "px";   // Handy: Schrift in den Pillen größer
-      // Goo-Blob
-      if (!GooGL && flying && visible) {
-        const cx = R.left + R.width / 2, cy = R.top + R.height / 2;
-        c.blob.setAttribute("x", (-R.width / 2).toFixed(2)); c.blob.setAttribute("y", (-R.height / 2).toFixed(2));
-        c.blob.setAttribute("width", R.width.toFixed(2)); c.blob.setAttribute("height", R.height.toFixed(2));
-        c.blob.setAttribute("rx", (Math.min(R.width, R.height) / 2).toFixed(2));
-        c.blob.setAttribute("transform", `translate(${cx.toFixed(2)} ${cy.toFixed(2)}) rotate(${ang.toFixed(1)}) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) rotate(${(-ang).toFixed(1)})`);
-        c.blob.style.display = "";
-      } else c.blob.style.display = "none";
+      // Schriftgröße: in Ruhe echte Größe (scharf); in Bewegung feste Grundgröße + Skalierung auf der Grafikkarte –
+      // sonst müsste die Schrift in jedem Bild neu gerendert werden (das hat beim Übergang Kreise → Pillen gehakt)
+      const fs = Math.min(lerp(20, 18, e3), R.width / lerp(5.6, VW < 600 ? 5.1 : 6.6, clamp(e3)));   // Handy: Schrift in den Pillen größer
+      if (settled) {
+        const f = fs.toFixed(1);
+        if (c._fs !== f) { c._fs = f; c.el.style.fontSize = f + "px"; }
+        if (c._sc) { c._sc = 0; c.label.style.scale = ""; }
+      } else {
+        if (c._fs !== "20") { c._fs = "20"; c.el.style.fontSize = "20px"; }
+        c._sc = 1; c.label.style.scale = (fs / 20).toFixed(3);
+      }
     }
     if (flying && visible) {
-      anyGoo = true;
       // Stauchung nur entlang der Hauptachsen nähern (reicht für die kleinen Werte)
       const ca = Math.abs(Math.cos(ang * Math.PI / 180)), sa = 1 - ca;
       blobs.push({ x: R.left + R.width / 2, y: R.top + R.height / 2, r: Math.min(R.width, R.height) / 2, hw: R.width / 2, hh: R.height / 2,
                    sx: lerp(sy, sx, ca), sy: lerp(sy, sx, sa) });
     }
   }
-  if (GooGL) GooGL.draw(blobs); else goo.classList.toggle("on", anyGoo);
+  if (GooGL) GooGL.draw(blobs, SY);
 }
 
 /* =========================================================
@@ -918,7 +945,7 @@ const dotsEl = $("#dots"), dotsFill = $("#dotsFill");
 track.innerHTML = PROJECTS.map((p, i) => `
   <article class="card" data-tags="${p.tags.join(",")}">
     <div class="card__media">
-      <img class="card__img" src="${IMG(p.img)}" alt="${p.title}" loading="lazy" draggable="false" style="object-position:${p.pos}" />
+      <img class="card__img" src="${IMG(p.img)}" alt="${p.title}" decoding="async" draggable="false" style="object-position:${p.pos}" />
       <div class="card__shade"></div>
     </div>
     <div class="card__info">
@@ -930,27 +957,8 @@ track.innerHTML = PROJECTS.map((p, i) => `
   </article>`).join("");
 const cards = $$(".card", track);
 if (!cards.length) { track.insertAdjacentHTML("afterend", '<p class="work-empty">Projekte folgen.</p>'); secWork.classList.add("is-empty"); }
-const thisPage = location.pathname.split("/").pop() || "portfolio-v13.html";
 cards.forEach((c, i) => c.addEventListener("click", () => openProject(i)));
-// Rückkehr von einer Projektseite: Position wiederherstellen
-try {
-  const back = JSON.parse(sessionStorage.getItem("pp-return") || "null");
-  if (back && back.page === thisPage && /von-projekt/.test(location.hash)) {
-    hist("replaceState", null, "", location.pathname);
-    // genau zu „Arbeiten" zurück (auch wenn sich Höhen inzwischen geändert haben) und den Magneten nicht täuschen
-    const restore = () => {
-      const y = back.sec === "arbeiten" ? docTop($("#arbeiten")) : back.y;
-      SNAP.startY = y; SNAP.cool = performance.now() + 600;
-      if (lenis) lenis.scrollTo(y, { immediate: true }); else window.scrollTo(0, y);
-      trackWrap.scrollLeft = back.sl || 0; work.snapTo = null;
-    };
-    requestAnimationFrame(restore);
-    addEventListener("load", () => requestAnimationFrame(restore), { once: true });
-    setTimeout(restore, 350);
-  }
-} catch (e) {}
-const work = { wrote: -1, view: "row", skew: 0, lastSL: 0, gap: 20, hInput: 0, snapTo: null, idx: -1, n: -1, fill: 0 };
-const isGrid = () => false;
+const work = { wrote: -1, skew: 0, lastSL: 0, gap: 20, hInput: 0, snapTo: null, idx: -1, n: -1, fill: 0 };
 
 function sizeCards() {
   const meta = $(".arbeiten__meta");
@@ -981,7 +989,7 @@ function sizeCards() {
   }
   requestAnimationFrame(() => cards.forEach((c) => fitTitle(c.querySelector(".card__title"))));
   work.gap = VW < 900 ? 18 : 20;
-  track.style.gap = isGrid() ? "" : work.gap + "px";
+  track.style.gap = work.gap + "px";
   const cw = parseFloat(track.style.getPropertyValue("--cw")) || 400;
   layoutDots();
 }
@@ -1031,7 +1039,7 @@ function toggleFilter(cat) {
 /* Reihe: Ziehen + Schwung, Pfeile */
 const drag = { down: false, moved: false, sx: 0, sl: 0, v: 0, lx: 0, lt: 0, glide: 0 };
 trackWrap.addEventListener("pointerdown", (e) => {
-  if (isGrid() || e.pointerType !== "mouse" || e.button !== 0) return;
+  if (e.pointerType !== "mouse" || e.button !== 0) return;
   drag.down = true; drag.moved = false; drag.sx = e.clientX; drag.sl = trackWrap.scrollLeft; drag.lx = e.clientX; drag.lt = performance.now(); drag.v = 0; drag.glide = 0;
 });
 addEventListener("pointermove", (e) => {
@@ -1053,9 +1061,9 @@ trackWrap.addEventListener("click", (e) => { if (drag.moved) { e.preventDefault(
 trackWrap.addEventListener("wheel", (e) => {
   const now = performance.now();
   const horiz = Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey;
-  if (!horiz) return;                                  // vertikal → Seite scrollt (etwas gebremst, siehe Lenis)
+  if (!horiz) return;                                  // vertikal → Seite scrollt normal
   const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
-  e.preventDefault(); e.stopPropagation();           // Seite (und Lenis) bekommen nichts vom horizontalen Wischen
+  e.preventDefault(); e.stopPropagation();           // Seite bekommt nichts vom horizontalen Wischen
   trackWrap.scrollLeft += dx * 1.8;
   work.hInput = now; work.snapTo = null;
 }, { passive: false });
@@ -1152,7 +1160,6 @@ function updateWork(dt) {
   if (!cards.length) return;   // noch keine Projekte im CMS
   if ((wTop > VH * 1.25 || wTop + WORK_H < -VH * .25) && cardSpr[0].init && Math.abs(drag.glide) < .1 && !drag.down && work.snapTo !== null) return;
   updateCardsIn(dt);
-  if (isGrid()) return;
   if (Math.abs(drag.glide) > .1) { trackWrap.scrollLeft += drag.glide; drag.glide *= Math.pow(.9, dt * 60); }
   const max = trackWrap.scrollWidth - trackWrap.clientWidth;
   // Karten rasten ein: nach dem Wischen/Ziehen zur nächsten Karte gleiten
@@ -1179,10 +1186,17 @@ const wmChars = $$(".ch", wmText);
 // Impressum beginnt genau auf der Linie von Mail / Instagram / LinkedIn
 function alignLegal() {
   const l = $(".footer__links"), g = $(".footer__legal"); if (!l || !g) return;
+  // Desktop: Kontaktangaben (und damit auch die Zeile darunter) beginnen genau unter „Leistungen" in der Nav
+  const nl = $(".nav__links a"), top = $(".footer__top");
+  if (nl && top && getComputedStyle(nl.parentElement).display !== "none" && VW > 900) {
+    const x = nl.getBoundingClientRect().left - top.getBoundingClientRect().left - parseFloat(getComputedStyle(top).paddingLeft);
+    l.style.marginLeft = Math.max(0, x).toFixed(1) + "px";
+  } else l.style.marginLeft = "";
   const x = l.getBoundingClientRect().left - g.getBoundingClientRect().left - parseFloat(getComputedStyle(g).paddingLeft);
   g.style.setProperty("--legx", x > 20 ? x.toFixed(1) + "px" : "auto");   // Handy: Links stehen links → normal verteilen
   // Animation unten so hoch wie der große Name plus die Zeile darunter
-  const nameH = wmText.getBoundingClientRect().height, legH = g.offsetHeight;
+  const cs = getComputedStyle(g), nameH = wmText.getBoundingClientRect().height;
+  const legH = g.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + 36;
   if (nameH) document.documentElement.style.setProperty("--striph", Math.round(nameH + legH) + "px");
 }
 function fitWordmark() {
@@ -1263,7 +1277,7 @@ const Player = (() => {
     win.hidden = true; win.style.visibility = "";
     task.hidden = true;
     zoomRect(from || to, to, () => {
-      win.hidden = false; isOpen = true; loopOn(); setVol(vol); ui.play.focus({ preventScroll: true });
+      win.hidden = false; win.classList.remove("is-inactive"); isOpen = true; loopOn(); setVol(vol); ui.play.focus({ preventScroll: true });   // offen = aktives Fenster
       if (state === "idle" || state === "stopped") { try { video.currentTime = 0; } catch (e) {} setState("playing"); }   // startet von selbst
     });
   }
@@ -1359,8 +1373,6 @@ const Player = (() => {
     if (video.readyState >= 2) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(video, 0, 0, 320, 240);
-      ctx.fillStyle = "rgba(0,0,0,.12)";
-      for (let y = 0; y < 240; y += 3) ctx.fillRect(0, y, 320, 1);
     } else { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 320, 240); }
   }
   function frame(now) {
@@ -1452,9 +1464,16 @@ function fillProject(i) {
     povProject.innerHTML = LEGAL_HTML;
     POV.pal = LEGAL.palette.map(hexToRgb);
     document.title = "Rechtliches — Pascal Pampel";
+    $("#povHeadTitle").textContent = "Rechtliches";
+    povHead.style.width = "";
+    requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
+    povPanel.classList.remove("has-head");
     return;
   }
   const P = DATA[i]; if (!P) return;
+  $("#povHeadTitle").innerHTML = umlTitle(P.title);
+  povPanel.classList.remove("has-head");
+  requestAnimationFrame(povHeadSize);
   const media = P.media && P.media.length ? P.media : [{ type: "image", src: P.cover }];
   povProject.innerHTML = `
     <div class="split">
@@ -1489,7 +1508,7 @@ function openProject(i, { push = true, replace = false } = {}) {
   POV.returnY = scrollY;
   document.body.classList.add("pov-open");
   pov.setAttribute("aria-hidden", "false");
-  if (lenis) lenis.stop(); else document.documentElement.style.overflow = "hidden";
+  lockScroll(true);
   povPanel.scrollTop = 0;
   requestAnimationFrame(() => { pov.classList.add("is-open"); povPanel.focus({ preventScroll: true }); });
 }
@@ -1503,14 +1522,29 @@ function closeProject({ fromHistory = false } = {}) {
   pov.setAttribute("aria-hidden", "true");
   document.title = "Pascal Pampel — Gestaltung";
   if (!fromHistory) hist("replaceState", null, "", location.pathname);
-  if (lenis) lenis.start(); else document.documentElement.style.overflow = "";
+  lockScroll(false);
 }
 addEventListener("popstate", (e) => {
   const slug = e.state && e.state.pov;
   if (slug) { const i = slug === LEGAL.slug ? -1 : DATA.findIndex((p) => p.slug === slug); if (i >= -1 && (i >= 0 || slug === LEGAL.slug)) openProject(i, { push: false }); }
   else closeProject({ fromHistory: true });
 });
-povPanel.addEventListener("click", (e) => { if (e.target.closest("[data-back]")) closeProject(); });   // auch für die Pfeile im Projektinhalt
+povPanel.addEventListener("click", (e) => { if (e.target.closest("[data-back]")) closeProject(); });
+// Kopfzeile einblenden, sobald die Projekt-Überschrift oben aus dem Panel gescrollt ist
+const povHeadUpd = () => {
+  const t = povProject.querySelector(".project__title");
+  const on = !!t && t.getBoundingClientRect().bottom < povPanel.getBoundingClientRect().top + 64;
+  if (on !== povPanel.classList.contains("has-head")) povPanel.classList.toggle("has-head", on);
+};
+povPanel.addEventListener("scroll", povHeadUpd, { passive: true });
+// Kopfzeile nur so breit wie die Textspalte – die Bilder rechts bleiben frei
+const povHead = $(".pov__head");
+function povHeadSize() {
+  const info = povProject.querySelector(".split__info");
+  const one = info && getComputedStyle(info.parentElement).gridTemplateColumns.split(" ").length < 2;
+  povHead.style.width = info && !one ? Math.round(info.getBoundingClientRect().right - povPanel.getBoundingClientRect().left + parseFloat(getComputedStyle(povHead).paddingLeft) * .5) + "px" : "";
+}
+addEventListener("resize", () => { if (POV.open) povHeadSize(); });   // auch für die Pfeile im Projektinhalt
 
 /* Bilder & Videos im Projekt: anklicken → groß vor dem abgedunkelten, weiter animierten Hintergrund */
 const LB = { open: false, items: [], i: 0, el: $("#povLB") };
@@ -1585,45 +1619,54 @@ function updatePov(dt) {
 /* =========================================================
    13. MAIN LOOP
    ========================================================= */
-let simTime = 3.0, footTime = 9.0, lastT = performance.now();
+let simTime = 3.0, footTime = 9.0, lastT = performance.now(), scrollT = 0, lastSCY = -1;
 const footHue = { v: 0 };
 
 function onResize() {
   if (POV.open) requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
-  VW = innerWidth; VH = innerHeight; _pad = null;
+  VW = vpW(); VH = innerHeight; _pad = null;
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   heroGL.resize(); footGL.resize(); if (POV.gl) POV.gl.resize();
-  sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); cacheNav();
+  sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); cacheNav(); cacheGeo();
   chips.forEach((c) => (c.last = ""));
 }
 addEventListener("resize", onResize);
 
 let frameNo = 0;
-const perf = { acc: 0, n: 0, lowered: 0 };
+const perf = { acc: 0, n: 0, slow: 0, base: 0 };
+// Auflösung nur dann senken, wenn es wirklich dauerhaft ruckelt – und wieder anheben, sobald es flüssig läuft.
+// (Vorher: kurze Laderuckler am Anfang haben die Auflösung dauerhaft gedrückt → Hintergrund pixelig.)
 function watchPerf(dt) {
-  if (window.__noperf) return;
+  if (window.__noperf || document.hidden) return;
+  if (performance.now() < 4000) return;                        // Ladephase ignorieren
   perf.acc += dt; perf.n++;
-  if (perf.n < 45) return;
+  if (perf.n < 60) return;
   const avg = perf.acc / perf.n; perf.acc = 0; perf.n = 0;
-  if (avg > 1 / 45 && perf.lowered < 3 && scrollY < HERO_H) {   // < 45 fps im Hero → Auflösung etwas senken
-    perf.lowered++; heroGL.scale *= .85; heroGL.resize();
+  if (SCY >= HERO_H) { perf.slow = 0; return; }
+  const base = perf.base || (perf.base = heroGL.scale);
+  if (avg > 1 / 40) {
+    if (++perf.slow >= 2 && heroGL.scale > base * .8 + .001) { heroGL.scale = Math.max(base * .8, heroGL.scale * .9); heroGL.resize(); perf.slow = 0; }
+  } else {
+    perf.slow = 0;
+    if (avg < 1 / 55 && heroGL.scale < base - .001) { heroGL.scale = Math.min(base, heroGL.scale / .9); heroGL.resize(); }
   }
 }
 function tick(now) {
   frameNo++;
   const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
-  if (lenis) lenis.raf(now);
+  stepScroll(now);
   SCY = scrollY;
-  updatePage();
+  if (Math.abs(SCY - lastSCY) > .5) { scrollT = performance.now(); lastSCY = SCY; }
 
   // Lesen vor dem Schreiben: Position des Footers abfragen, bevor die Kreise ihre Größe ändern (vermeidet erzwungenes Layout)
-  const fr = footStrip.getBoundingClientRect();
+  if (!GEO.ok) cacheGeo();
+  const fr = vr(GEO.foot);
   // Chips zuerst (setzt splitP für den Hero)
   updateChips(dt);
 
   if (scrollY < HERO_H + 10) {
     updateOrbit(dt);
-    const hd = paced("hero", dt, performance.now() - (pointer.t || 0) < 700);
+    const hd = paced("hero", dt, true);   // Hero immer mit voller Bildrate – fließt gleichmäßig
     if (hd) { simTime += hd; if (!window.__nogl && POV.alpha < .98) heroGL.render(simTime, hd); }
   }
   if (fr.top < VH && fr.bottom > 0) {
@@ -1637,21 +1680,31 @@ function tick(now) {
 
   updateNav();
   updateWork(dt);
-  updateSnap();
-  updateGrain(dt);
   watchPerf(dt);
   updatePov(dt);
   requestAnimationFrame(tick);
 }
 
 function start() {
-  initLenis();
-  onResize();
+  onResize(); SNAP.rest = scrollY;
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitOrbitText(); fitWordmark(); alignLegal(); cacheNav(); layoutDots(); });
-  requestAnimationFrame(() => document.body.classList.add("is-loaded"));
   requestAnimationFrame(tick);
+  // erst einblenden, wenn Schrift geladen und der Hintergrund schon gezeichnet ist – dann startet auch das Intro
+  let shown = false;
+  const reveal = () => { if (shown) return; shown = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.documentElement.classList.add("is-ready"); document.body.classList.add("is-loaded");
+    }));
+  };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(reveal);
+  setTimeout(reveal, 900);   // spätestens dann, falls eine Schrift hängt
+  // Kartenbilder schon vorab im Leerlauf dekodieren – sonst passiert das genau beim ersten Scrollen zu „Arbeiten"
+  const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
+  idle(() => $$(".card__img").forEach((im) => im.decode && im.decode().catch(() => {})), { timeout: 2500 });
 }
 if (document.readyState === "complete") start(); else addEventListener("load", start);
+// nach der Einflug-Animation der Nav (Positionen sind dann endgültig) noch einmal ausrichten
+setTimeout(() => alignLegal(), 1900);
 
 window.PP = { PROJECTS, SERVICES, Player };
 })();
