@@ -26,8 +26,89 @@
     ]
   },
   {
-    "title": "Social Ads",
+    "title": "Kerf-Lampe",
+    "slug": "kerf-lampe",
+    "tags": [
+      "Ideen"
+    ],
+    "short": "Lampe aus gelaserten Holzplatten. Durch Kerf-Cutting wird steifes Holz biegsam.",
+    "text": "Mit dieser Lampe habe ich Kerf-Cutting ausprobiert. Dabei werden spezielle Schnittmuster in Holzplatten gelasert, bis sich das Material biegen lässt. Aus etwas Flachem und Steifem wird so eine weiche Form.\n\nVon allen Objekten, die ich bisher gebaut habe, bin ich auf dieses am stolzesten."
+  },
+  {
+    "title": "Dampfende Wildsau",
+    "slug": "dampfende-wildsau",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Ein Logo aus meinen Anfängen. Inzwischen wird es mehrfach als Tattoo getragen.",
+    "text": "Die dampfende Wildsau gehört zu meinen ersten Logos. Vieles würde ich heute anders machen. Trotzdem hat sie Bestand, und zwar so sehr, dass sie inzwischen mehrfach als Tattoo getragen wird.\n\nDas Gesicht einer Gemeinschaft zu gestalten, ist jedes Mal etwas Besonderes. Die eigene Arbeit in der Region wiederzusehen, freut mich bis heute. Auf Haut ist das noch mal eine andere Nummer."
+  },
+  {
+    "title": "Wildsau on Twitch",
+    "slug": "wildsau-on-twitch",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Plakat für die dampfende Wildsau."
+  },
+  {
+    "title": "ExhiBeat",
+    "slug": "exhibeat",
+    "year": "2022 – 2024",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Werbemittel für die audiovisuelle Ausstellungsreihe im Raum Hof. Psychedelische Texturen im Kontrast zu klarem Symbolismus.",
+    "text": "ExhiBeat ist eine Ausstellungsreihe im Raum Hof, bei der Kunst und Musik zusammenkommen. Die Bildmarke verbindet beides: ein Auge zum Sehen, eine Schallplatte zum Hören. Auch die Wortmarke spielt mit diesem Gegensatz.\n\nEine reduzierte, fast brutalistische Basis trifft auf organische, psychedelische Texturen. Bei der Veranstaltung stand ich außerdem selbst auf der Bühne, als „Pampelmann“. Auch da ging es um Kontraste: Synthesizer und Drum-Machine-Patterns, dazu improvisierte E-Gitarre."
+  },
+  {
+    "title": "Alles nur Schein",
+    "slug": "alles-nur-schein",
+    "tags": [
+      "Video"
+    ],
+    "short": "Ein Video aus dem Studium zur Frage „Was kann Design?“. Meine Antwort: den Geldschein.",
+    "text": "Im Modul Cast sollten wir mit einem Video zeigen, was Design kann. Meine Antwort war der Geldschein. Ästhetik, Funktion und Sicherheit stecken in kaum einem anderen Objekt so dicht beieinander.\n\nText, Moderation und Postproduktion kamen von mir. Das Moderieren war schwieriger als gedacht, ohne Brille und mit der nächsten Zeile im Kopf zwischen jedem Take. Das Video sollte nicht nur informieren, sondern auch unterhalten. Gelernt habe ich vor allem eins: Einen Greenscreen sollte man ordentlich ausleuchten."
+  },
+  {
+    "title": "Pfand 2.0",
+    "slug": "pfand-2-0",
+    "tags": [
+      "Ideen"
+    ],
+    "short": "Ein Pfandautomat im Stil alter Spielautomaten, der zusammengeknüllte PET-Flaschen scannen kann.",
+    "text": "Im Studium ist dieser Pfandautomat entstanden, inspiriert von alten Videospielautomaten. Er kann zusammengeknüllte PET-Flaschen scannen. So bringt man mehr auf einmal zurück und muss sich nicht mit sperrigen Flaschen abmühen.\n\nAus einer lästigen Pflicht wird so fast etwas, auf das man Lust hat."
+  },
+  {
+    "title": "El Macuá",
+    "slug": "el-macua",
+    "year": "2020",
+    "tags": [
+      "Ideen"
+    ],
+    "short": "Ein Messer aus gebrauchten Teppichmesserklingen, inspiriert vom Macuahuitl, einer alten mesoamerikanischen Waffe.",
+    "text": "Im zweiten Semester sollten wir im Fach CGO ein neues Messer entwerfen, das klassische Teppichmesserklingen nutzt. Als Vorbild diente mir der Macuahuitl, eine alte mesoamerikanische Waffe.\n\nTeppichmesserklingen werden meist nur an der Spitze stumpf. El Macuá verwendet sie deshalb weiter. Die Klingen sitzen sich gegenüber und bilden zusammen eine sägeartige Schneide. Die Ornamente oben sind gleichzeitig Flügelmuttern: hochklappen, drehen, bis genug Platz ist, Klingen rein.\n\nDamit kann man sich durch den eigenen Garten oder den nächstgelegenen Dschungel schlagen und nebenbei alte Klingen recyceln."
+  },
+  {
+    "title": "Freie Plakatserie",
     "slug": "freie-plakatserie",
+    "year": "2021 – 2023",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Freie Plakatserie aus dem Studium. Selbst erstellte Texturen treffen auf minimalistische Grafik und Typo.",
+    "text": "Irgendwann habe ich einfach drauflos gestaltet. Ohne Briefing, ohne Kunde, nur mit der Frage, welche Workflows mir eigentlich Spaß machen. Daraus ist über zwei Jahre diese Plakatserie entstanden und nebenbei auch mein persönlicher Stil.\n\nDie Texturen habe ich größtenteils selbst erstellt, mit Verzerrungs- und Unschärfefiltern und Blendmodi, bis aus etwas Digitalem etwas fast Analoges wurde. Dazu kommen reduzierte Grafiken und Typo. Gearbeitet habe ich in Affinity, wo Bild, Vektor und Layout in einem Programm stecken. Das hat sich weniger nach Gestalten angefühlt und mehr nach Jammen."
+  },
+  {
+    "title": "Typografieplakate",
+    "slug": "typografieplakate",
+    "tags": [
+      "Grafik"
+    ]
+  },
+  {
+    "title": "Social Ads",
+    "slug": "social-ads",
     "year": "2023 – 2025",
     "tags": [
       "Grafik",
@@ -35,6 +116,77 @@
       "Werbung"
     ],
     "cover": "assets/img/Social-Ads_MainPic_2.png",
-    "coverPosition": "70%"
+    "coverPosition": "70%",
+    "short": "Static und Motion für Social Ads bei Crew69, stilbezirk und freelance. Konzept, Text, Dreh und Post aus einer Hand.",
+    "text": "Bei Crew69 habe ich mehrere Kunden betreut, die regelmäßig mit statischem und bewegtem Content versorgt werden wollten. Konzept, Text, Dreh, Postproduktion. Alles aus einer Hand. Später kamen Projekte bei stilbezirk und als Freelancer dazu.\n\nBesonders stolz bin ich auf ivvi, einen Kunden, den ich allein betreut habe. Die Themen waren meist eher wenig appetitlich. Trotzdem ist es gelungen, dem Ganzen eine Wertigkeit zu geben, die man nicht unbedingt erwartet.\n\nDie Bandbreite reichte vom Luxus-Retreat bis zum Durchfall verhindernden Nahrungsergänzungsmittel für Hunde. Oft mit wenig Ausgangsmaterial, aber immer mit dem selbst gesteckten Ziel, das Beste rauszuholen."
+  },
+  {
+    "title": "Hörzentrum Nordbayern",
+    "slug": "hoerzentrum",
+    "tags": [
+      "Grafik",
+      "Werbung"
+    ],
+    "short": "Kampagne für das Hörzentrum Nordbayern. Lautmalerische Wörter treffen auf Fotos und eine einfache Frage.",
+    "text": "„Zisch“, „Plopp“, „Quietsch“. Jedes Motiv kombiniert ein lautmalerisches Wort mit einem Foto und fragt: „Sie können es lesen, aber können Sie es hören?“ Beim Lesen hört man das Geräusch automatisch im Kopf. Ob auch in echt, ist dann die eigentliche Frage.\n\nEntstanden ist die Idee als Übung während meiner Ausbildung. Später wurde sie dem Hörzentrum gepitcht, die Zielrichtung blieb dieselbe."
+  },
+  {
+    "title": "Minimalistischer Kalender",
+    "slug": "minimalistischer-kalender",
+    "year": "2020",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Ein Kalender für 2021, jeder Monat auf eine einfache Form reduziert. Entstanden als Last-Minute-Weihnachtsgeschenk.",
+    "text": "Eigentlich ein Last-Minute-Weihnachtsgeschenk, entsprechend kurz war die Entstehungszeit. Die Aufgabe, die ich mir gestellt habe: jeden Monat so minimalistisch wie möglich darstellen, ohne dass er austauschbar wird.\n\nIch arbeite gern mit Vektoren, deshalb war der Zeitdruck weniger schlimm, als er klingt. Eher im Gegenteil."
+  },
+  {
+    "title": "Aprikose, Banane, Erdbeer",
+    "slug": "aprikose-banane-erdbeer",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Buchkonzept zu „Aprikose, Banane, Erdbeer“ von Helge Schneider."
+  },
+  {
+    "title": "Pimp",
+    "slug": "pimp",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Buchkonzept zu „Pimp“ von Iceberg Slim."
+  },
+  {
+    "title": "Walden",
+    "slug": "walden",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Buchkonzept zu „Walden“ von Henry David Thoreau."
+  },
+  {
+    "title": "Shadows in the Attic",
+    "slug": "shadows-in-the-attic",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Drei Plattencover für eine fiktive Band, die zusammen eine Serie ergeben.",
+    "text": "Shadows in the Attic gibt es nicht. Die Cover schon. Für die fiktive Band habe ich drei Plattencover gestaltet, die aufeinander aufbauen und zusammen eine Serie ergeben."
+  },
+  {
+    "title": "Slippy Slopes",
+    "slug": "slippy-slopes",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Plattencover für Slippy Slopes."
+  },
+  {
+    "title": "Divergence",
+    "slug": "divergence",
+    "tags": [
+      "Grafik"
+    ],
+    "short": "Cover für die EP „Divergence“ von Peter Leupold."
   }
 ]
