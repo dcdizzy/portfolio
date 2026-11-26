@@ -329,6 +329,7 @@ class FlowGL {
     if (changed && this._t != null) this.render(this._t, 0);
   }
   updateMouse(dt) {
+    if (this.noMouse) { this.m.vx = this.m.vy = 0; this.m.px = null; return; }   // Projektseite: keine Reaktion auf die Maus
     const r = this.track.getBoundingClientRect();
     const inside = pointer.inside && pointer.x >= r.left && pointer.x <= r.right && pointer.y >= r.top && pointer.y <= r.bottom;
     const x = (pointer.x - r.left) / r.width, y = 1 - (pointer.y - r.top) / r.height;
@@ -642,7 +643,10 @@ if (TOUCHUI) {
     const moved = y - TOUCH.s0, dir = Math.abs(v) > .25 ? Math.sign(v) : Math.abs(moved) > Math.min(70, VH * .08) ? Math.sign(moved) : 0;
     let target = dir ? nextPt(y, dir) : nearPt(y);
     if (target === undefined) target = nearPt(y);
-    glideTo(target, { v0: Math.sign(target - y) === Math.sign(v) ? v : 0, m0min: .6 });   // ohne zähen Anlauf
+    const same = Math.sign(target - y) === Math.sign(v), dd = Math.abs(target - y);
+    // schneller Wisch → kürzere Dauer, damit die Seite mit dem Finger-Tempo weiterläuft statt abzubremsen
+    const dur = same && Math.abs(v) > .15 ? clamp(2 * dd / Math.abs(v), 320, 560 + 430 * Math.min(1.6, dd / VH)) : 0;
+    glideTo(target, { v0: same ? v : 0, m0min: .6, dur });   // ohne zähen Anlauf
   };
   addEventListener("touchend", (e) => { if (!e.touches.length) release(); }, { passive: true });
   addEventListener("touchcancel", release, { passive: true });
@@ -1164,20 +1168,21 @@ wmText.innerHTML = [...wmText.textContent].map((c, i, a) => {
   return `<span class="ch"${k ? ` style="margin-right:${k}em"` : ""}>${c === " " ? "&nbsp;" : c}</span>`;
 }).join("");
 // Impressum beginnt genau auf der Linie von Mail / Instagram / LinkedIn
+// Lage im Layout, unabhängig von Animationen (transform) – sonst springt beim Laden etwas
+const layoutLeft = (el) => { let x = 0; for (; el; el = el.offsetParent) x += el.offsetLeft; return x; };
 function alignLegal() {
   const l = $(".footer__links"), g = $(".footer__legal"); if (!l || !g) return;
-  // Desktop: Kontaktangaben (und damit auch die Zeile darunter) beginnen genau unter „Leistungen" in der Nav
+  // Desktop: Kontaktangaben (und die Zeile unter dem Namen) beginnen genau unter „Leistungen" in der Nav
   const nl = $(".nav__links a"), top = $(".footer__top");
   if (nl && top && getComputedStyle(nl.parentElement).display !== "none" && VW > 900) {
-    const x = nl.getBoundingClientRect().left - top.getBoundingClientRect().left - parseFloat(getComputedStyle(top).paddingLeft);
+    const x = layoutLeft(nl) - layoutLeft(top) - parseFloat(getComputedStyle(top).paddingLeft);
     l.style.marginLeft = Math.max(0, x).toFixed(1) + "px";
   } else l.style.marginLeft = "";
-  const x = l.getBoundingClientRect().left - g.getBoundingClientRect().left - parseFloat(getComputedStyle(g).paddingLeft);
+  const x = layoutLeft(l) - layoutLeft(g) - parseFloat(getComputedStyle(g).paddingLeft);
   g.style.setProperty("--legx", x > 20 ? x.toFixed(1) + "px" : "auto");   // Handy: Links stehen links → normal verteilen
-  // Animation unten so hoch wie der große Name plus die Zeile darunter
-  const cs = getComputedStyle(g), nameH = wmText.getBoundingClientRect().height;
-  const legH = g.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + 36;
-  if (nameH) document.documentElement.style.setProperty("--striph", Math.round(nameH + legH) + "px");
+  // Animation unten so hoch wie oben der Abstand vom Fensterrand bis zur Nav-Linie
+  const line = $(".nav__line");
+  if (line) { let y = 0; for (let e = line; e; e = e.offsetParent) y += e.offsetTop; document.documentElement.style.setProperty("--striph", Math.round(y + line.offsetHeight) + "px"); }
 }
 function fitWordmark() {
   wmText.style.fontSize = "100px";
@@ -1402,7 +1407,7 @@ function mediaItem(m, i, P) {
   return `<figure class="${cls}" ${st}><img src="${esc(m.src)}" alt="${esc(m.caption || P.title)}" loading="${i ? "lazy" : "eager"}" />${cap}</figure>`;
 }
 // „Rechtliches" nutzt dasselbe Overlay wie die Projekte – nur mit schwarz-weißem Verlauf
-const LEGAL = { slug: "rechtliches", title: "Rechtliches", palette: ["#0c0c0c", "#3a3a3a", "#d6d6d6", "#808080"] };
+const LEGAL = { slug: "rechtliches", title: "Rechtliches", palette: ["#0e0e0e", "#343434", "#9c9c9c", "#686868"] };
 const LEGAL_HTML = `
   <div class="legal">
     <div class="project__bar" style="--i:0"><button type="button" class="back" data-back aria-label="Alle Arbeiten"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5 5 8l5.5 5.5" /></svg></button></div>
@@ -1461,14 +1466,53 @@ function fillProject(i) {
       <div class="split__media${P.media && P.media.length ? "" : " is-cover-only"}">${media.map((m, k) => mediaItem(m, k, P)).join("")}</div>
     </div>`;
   // Farben des Rahmens aus der Bildwelt (CMS-Palette, sonst Standard)
-  POV.pal = (P.palette && P.palette.length >= 4 ? P.palette.slice(0, 4).map(hexToRgb) : PAL_HERO.map((x) => x.slice()));
+  if (P.palette && P.palette.length >= 4) POV.pal = P.palette.slice(0, 4).map(hexToRgb);
+  else {
+    POV.pal = POV.pal || PAL_HERO.map((x) => x.slice());
+    if (P.cover) coverPalette(P.cover).then((pal) => { if (pal && DATA[POV.idx] === P) POV.pal = pal; });
+  }
   requestAnimationFrame(() => { fitTitle(povProject.querySelector(".project__title")); povHeadSize(); });
   if (document.fonts) document.fonts.ready.then(() => POV.open && povHeadSize());
   document.title = `${P.title} — Pascal Pampel`;
 }
+// Farben für den Hintergrund der Projektseite aus dem Titelbild: dunkle Grundfarbe, Mittelton, helle Fläche, kräftigster Akzent
+const PAL_CACHE = new Map();
+function coverPalette(src) {
+  if (PAL_CACHE.has(src)) return PAL_CACHE.get(src);
+  const p = new Promise((res) => {
+    const im = new Image(); im.crossOrigin = "anonymous"; im.decoding = "async";
+    im.onload = () => {
+      try {
+        const N = 40, cv = document.createElement("canvas"); cv.width = cv.height = N;
+        const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(im, 0, 0, N, N);
+        const d = cx.getImageData(0, 0, N, N).data, px = [];
+        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) px.push([d[i] / 255, d[i + 1] / 255, d[i + 2] / 255]);
+        if (px.length < 20) return res(null);
+        // k-means (5 Gruppen, wenige Durchläufe)
+        let C = [0, .2, .4, .6, .8].map((f) => px[Math.floor(f * (px.length - 1))].slice());
+        for (let it = 0; it < 8; it++) {
+          const S = C.map(() => [0, 0, 0, 0]);
+          for (const q of px) { let bi = 0, bd = 9; C.forEach((c, k) => { const dd = (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2; if (dd < bd) { bd = dd; bi = k; } }); const s = S[bi]; s[0] += q[0]; s[1] += q[1]; s[2] += q[2]; s[3]++; }
+          C = S.map((s, k) => s[3] ? [s[0] / s[3], s[1] / s[3], s[2] / s[3], s[3]] : C[k]);
+        }
+        const lum = (c) => .2126 * c[0] + .7152 * c[1] + .0722 * c[2], sat = (c) => Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2]);
+        const G = C.filter((c) => (c[3] || 0) > px.length * .03).sort((a, b) => lum(a) - lum(b));
+        if (G.length < 2) return res(null);
+        const dark = G[0], light = G[G.length - 1], mid = G[Math.floor(G.length / 2)];
+        const acc = [...G].sort((a, b) => sat(b) - sat(a))[0];
+        // in den ruhigen Helligkeitsbereich des Hero bringen (nie grell, nie schwarz)
+        const fit = (c, lo, hi) => { const L = Math.max(.001, lum(c)), t = clamp(L, lo, hi) / L; return [0, 1, 2].map((k) => clamp(c[k] * t, 0, .85)); };
+        res([fit(dark, .06, .14), fit(mid, .14, .3), fit(light, .3, .45), fit(acc, .22, .4)]);
+      } catch (e) { res(null); }
+    };
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+  PAL_CACHE.set(src, p); return p;
+}
 function openProject(i, { push = true, replace = false } = {}) {
   const P = i === -1 ? LEGAL : DATA[i]; if (!P) return;
-  if (!POV.gl) POV.gl = new FlowGL($("#povGL"), { palette: PAL_HERO.map((x) => x.slice()), scale: .5, zoom: 2.4, trackEl: pov });
+  if (!POV.gl) { POV.gl = new FlowGL($("#povGL"), { palette: PAL_HERO.map((x) => x.slice()), scale: .62, zoom: 2.4, trackEl: pov }); POV.gl.noMouse = true; }
   const swap = POV.open && POV.idx !== i;
   POV.idx = i;
   if (swap) {
@@ -1622,6 +1666,7 @@ const footHue = { v: 0 };
 function onResize() {
   if (POV.open) requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
   VW = vpW(); VH = innerHeight; _pad = null;
+  document.documentElement.style.setProperty("--vh", VH + "px");   // sichtbare Fensterhöhe (Handy: mit/ohne Browserleiste)
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   heroGL.resize(); footGL.resize(); if (POV.gl) POV.gl.resize();
   sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); sizeLeistBody(); fitUeber(); cacheNav(); cacheGeo();
@@ -1693,7 +1738,7 @@ function start() {
       document.documentElement.classList.add("is-ready"); document.body.classList.add("is-loaded");
     }));
   };
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitUeber(); reveal(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { onResize(); reveal(); });   // mit echter Schrift alles einmal neu ausrichten, dann einblenden
   setTimeout(reveal, 900);   // spätestens dann, falls eine Schrift hängt
   // Kartenbilder schon vorab im Leerlauf dekodieren – sonst passiert das genau beim ersten Scrollen zu „Arbeiten"
   const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));

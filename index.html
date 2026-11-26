@@ -10,7 +10,7 @@
   <script>setTimeout(function () { document.documentElement.classList.add("is-ready"); }, 5000);</script>
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=98" />
+  <link rel="stylesheet" href="css/style.css?v=99" />
 </head>
 <body>
 
@@ -122,12 +122,12 @@
       </ul>
     </div>
 
-    <div class="footer__legal"><span>© 2026</span><span class="footer__legal-links"><button type="button" class="legal-open" id="legalOpen">Rechtliches</button></span></div>
 
     <button class="wordmark" id="wordmark" type="button" aria-label="Pascal Pampel — Player öffnen">
       <span class="wordmark__text" id="wordmarkText">Pascal Pampel</span>
       <span class="wordmark__tip">▶ Eine Nachricht aus der Vergangenheit.avi</span>
     </button>
+    <div class="footer__legal"><span>© 2026</span><span class="footer__legal-links"><button type="button" class="legal-open" id="legalOpen">Rechtliches</button></span></div>
 
     <div class="footer__strip">
       <canvas id="footGL" aria-hidden="true"></canvas>
@@ -203,7 +203,7 @@
         const r = await fetch("content/projects.json", { cache: "no-store" });
         if (r.ok) { const d = await r.json(); window.PP_DATA = { projects: Array.isArray(d) ? d : (d.projects || []) }; }
       } catch (e) {}
-      const s = document.createElement("script"); s.src = "js/main.js?v=98"; document.body.appendChild(s);
+      const s = document.createElement("script"); s.src = "js/main.js?v=99"; document.body.appendChild(s);
     })();
   </script>
 </body>
