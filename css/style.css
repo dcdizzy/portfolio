@@ -44,7 +44,7 @@ img { display: block; max-width: 100%; }
 .nav {
   position: fixed; inset: 0 0 auto 0; z-index: 50;
   padding: 0 var(--pad);
-  transition: background .6s var(--ease-out), backdrop-filter .6s, box-shadow .6s;
+  transition: background .6s var(--ease-out), backdrop-filter .6s;
 }
 .nav__inner {
   display: flex; justify-content: space-between; align-items: center;
@@ -54,7 +54,6 @@ img { display: block; max-width: 100%; }
 .nav__brand, .nav__links a {
   font-size: 12px; letter-spacing: 3.6px; text-transform: uppercase;
   color: var(--ink);   /* gleiches Off-White wie der Rest */
-  text-shadow: 0 4px 4px rgba(0,0,0,.25);
 }
 .nav__brand { display: inline-flex; gap: 1em; cursor: pointer; letter-spacing: 2.4px; }
 
@@ -408,7 +407,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
   background: #c0c0c0; color: #000;
   font: 11px/1.25 Tahoma, "MS Sans Serif", Verdana, Geneva, sans-serif;
   -webkit-font-smoothing: none; font-smooth: never;
-  box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff, 6px 10px 0 rgba(0,0,0,.35);
+  box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #fff;   /* kein Schlagschatten */
   padding: 3px; user-select: none;
 }
 .w98[hidden] { display: none; }

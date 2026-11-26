@@ -10,7 +10,7 @@
   <script>setTimeout(function () { document.documentElement.classList.add("is-ready"); }, 5000);</script>
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=97" />
+  <link rel="stylesheet" href="css/style.css?v=98" />
 </head>
 <body>
 
@@ -203,7 +203,7 @@
         const r = await fetch("content/projects.json", { cache: "no-store" });
         if (r.ok) { const d = await r.json(); window.PP_DATA = { projects: Array.isArray(d) ? d : (d.projects || []) }; }
       } catch (e) {}
-      const s = document.createElement("script"); s.src = "js/main.js?v=97"; document.body.appendChild(s);
+      const s = document.createElement("script"); s.src = "js/main.js?v=98"; document.body.appendChild(s);
     })();
   </script>
 </body>
