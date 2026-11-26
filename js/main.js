@@ -317,7 +317,10 @@ class FlowGL {
   resize() {
     if (!this.ok) return;
     // kleine Bildschirme: höhere Auflösung, sonst wirkt der Verlauf am Handy pixelig
-    const d = this.scale * (SMALL ? 1.9 : 1);   // ohne devicePixelRatio → Grain auf jedem Bildschirm gleich, und deutlich weniger GPU-Last
+    // Auflösung: Grundwert × (Handy 1,9) × etwas mehr auf Retina-Bildschirmen – sonst sieht man dort an den feinen
+    // Linien des Verlaufs Treppchen/Pixel. Gedeckelt, damit die Grafikkarte nicht überlastet.
+    const q = clamp((devicePixelRatio || 1) * .75, 1, 1.5);
+    const d = this.scale * (SMALL ? 1.9 : q);
     const w = Math.max(2, Math.round(this.c.clientWidth * d)), h = Math.max(2, Math.round(this.c.clientHeight * d));
     const changed = this.c.width !== w || this.c.height !== h;
     if (changed) { this.c.width = w; this.c.height = h; }
@@ -395,7 +398,6 @@ footGL.refH = () => Math.min(heroEl.clientHeight, VW * (window.__fr || .625));  
   x.putImageData(img, 0, 0);
   document.documentElement.style.setProperty("--grain", `url(${g.toDataURL()})`);
 })();
-let grainT = 0;
 // Korn: läuft jetzt komplett per CSS-Animation (siehe .hero::after) – kein Eingriff pro Frame
 
 /* =========================================================
@@ -420,7 +422,10 @@ function fitOrbitText() {
   const len = orbitText.getComputedTextLength ? orbitText.getComputedTextLength() : 0;
   if (!len) return;
   const L = orbitState.len;
-  orbitState.baseFs = clamp(13.5 * (L * .64) / len, 11, 22);
+  // nie größer als der Fließtext bei Leistungen (sichtbare Größe, die Grafik ist am Handy skaliert)
+  const lb = $(".leistungen__body"), sc = (orbitText.getScreenCTM && orbitText.getScreenCTM()?.a) || 1;
+  const cap = lb ? parseFloat(getComputedStyle(lb).fontSize) / sc : 22;
+  orbitState.baseFs = clamp(13.5 * (L * .64) / len, 11, Math.min(22, cap));
   orbitState.baseLen = len * orbitState.baseFs / 13.5;
 }
 function setOrbitFont(fs) {
@@ -591,7 +596,7 @@ addEventListener("keydown", (e) => { if (SNAP.on && /^(Arrow|Page|Home|End| )/.t
 /* ---------- Handy: Finger ---------- */
 const TOUCHUI = matchMedia("(pointer: coarse)").matches;
 const TOUCH = { on: false, drag: false, axis: 0, x0: 0, y0: 0, s0: 0, want: 0, wrote: -1, track: false, hist: [] };
-const SKIP_TOUCH = ".w98, .rp-vol, .dots, .pov, .lb, input, textarea, select";
+const SKIP_TOUCH = ".w98, .rp-vol, .pov, .lb, input, textarea, select";
 if (TOUCHUI) {
   addEventListener("touchstart", (e) => {
     TOUCH.on = false; TOUCH.drag = false;
@@ -661,7 +666,7 @@ let navTops = [], navCut = -1;
 const navLinks = $$(".nav__links a, .nav__icons a");
 let WORK_TOP = 0, WORK_H = 0;
 function cacheNav() {
-  navTops = navSecs.map((s) => docTop(s)); snapPoints(); if (typeof layoutDots === "function") layoutDots();
+  navTops = navSecs.map((s) => docTop(s)); snapPoints();
   if (typeof trackWrap !== "undefined") { WORK_TOP = docTop(trackWrap); WORK_H = trackWrap.offsetHeight; }
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   cacheGeo();
@@ -696,6 +701,27 @@ $$(".reveal-title, .reveal").forEach((el) => io.observe(el));
    8. LEISTUNGEN · Text-Wechsel
    ========================================================= */
 const descEl = $("#serviceDesc"), listEl = $("#serviceList"), leistBody = $(".leistungen__body");
+// Textblock so hoch wie der längste Leistungstext – dann springt beim Wechsel nichts (der Abschnitt ist vertikal zentriert)
+// Über mich (Desktop): Text so groß wie möglich (max. 19 px), aber immer ganz in der Fensterhöhe
+function fitUeber() {
+  const el = $(".ueber__body .ueber__cols"); if (!el) return;
+  el.style.fontSize = "";
+  if (VW <= 900) return;
+  const need = () => { const k = el.children, a = k[0].getBoundingClientRect(), b = k[k.length - 1].getBoundingClientRect(); return b.bottom - a.top; };
+  let fs = 19;
+  while (fs > 12 && need() > el.clientHeight + 1) { fs -= .5; el.style.fontSize = fs + "px"; }
+}
+function sizeLeistBody() {
+  const clone = leistBody.cloneNode(true);
+  clone.querySelectorAll("[id]").forEach((e) => e.removeAttribute("id"));
+  clone.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:0;width:${leistBody.offsetWidth}px;min-height:0;margin:0`;
+  leistBody.parentNode.appendChild(clone);
+  const dE = clone.querySelector(".leistungen__desc"), lE = clone.querySelector(".leistungen__list");
+  let mx = 0;
+  for (const k in SERVICES) { dE.textContent = SERVICES[k].desc; lE.innerHTML = SERVICES[k].list.map((l) => `<li>${l}</li>`).join(""); mx = Math.max(mx, clone.offsetHeight); }
+  clone.remove();
+  leistBody.style.minHeight = Math.ceil(mx) + "px";
+}
 let activeService = "Grafik", swapTimer = null, shownService = null;
 function renderService(cat, instant) {
   const d = SERVICES[cat];
@@ -795,18 +821,21 @@ const circleSlots = $$("#slotCircles .slot"), pillSlots = $$("#slotPills .slot")
 const filters = new Set();
 const SVGNS = "http://www.w3.org/2000/svg";
 // Bei jedem Laden andere Reihenfolge und Geschwindigkeiten für die Zellteilung
-const SPLIT = CATS.map(() => ({ delay: Math.random() * .12, k: 300 + Math.random() * 140 }));
+const SPLIT = (() => { const o = CATS.map((_, i) => i).sort(() => Math.random() - .5);
+  return CATS.map((_, i) => ({ delay: o.indexOf(i) * .06 + Math.random() * .015, k: 300 + Math.random() * 140 })); })();
 let splitArmed = true;
 function reshuffleSplit() {
+  // jedes Mal eine neue, deutlich sichtbare Reihenfolge: zufällige Abfolge mit gleichmäßigen Abständen
+  const order = SPLIT.map((_, i) => i).sort(() => Math.random() - .5);
   SPLIT.forEach((s, i) => {
-    s.delay = Math.random() * .12; s.k = 300 + Math.random() * 140;   // schnell, kurze Versätze
+    s.delay = order.indexOf(i) * .06 + Math.random() * .015; s.k = 300 + Math.random() * 140;
     const sp = chips[i] && chips[i].s2;
     if (sp) { sp.k = s.k; sp.c = 2 * Math.sqrt(s.k); }   // kritisch gedämpft: kommt an, ohne nachzuwackeln
   });
 }
 const chips = CATS.map((cat, i) => {
   const el = document.createElement("button");
-  el.type = "button"; el.className = "chip is-hidden";   // unsichtbar, bis die Position berechnet ist el.dataset.cat = cat;
+  el.type = "button"; el.className = "chip is-hidden"; el.dataset.cat = cat;   // unsichtbar, bis die Position berechnet ist
   el.innerHTML = `<span class="chip__fill"></span><span class="chip__label">${cat}</span>`;
   chipsLayer.appendChild(el);
   const c = { el, cat, i, label: el.lastElementChild, s2: new Spring(SPLIT[i].k, 2 * Math.sqrt(SPLIT[i].k)), s3: new Spring(380, 2 * Math.sqrt(380)), last: "" };
@@ -941,7 +970,6 @@ function fitTitle(el) {
   if (w > cw + 1) el.style.fontSize = Math.floor(fs * cw / w * 0.98 * 10) / 10 + "px";
 }
 const secWork = $("#arbeiten"), track = $("#track"), trackWrap = $("#trackWrap");
-const dotsEl = $("#dots"), dotsFill = $("#dotsFill");
 track.innerHTML = PROJECTS.map((p, i) => `
   <article class="card" data-tags="${p.tags.join(",")}">
     <div class="card__media">
@@ -958,10 +986,12 @@ track.innerHTML = PROJECTS.map((p, i) => `
 const cards = $$(".card", track);
 if (!cards.length) { track.insertAdjacentHTML("afterend", '<p class="work-empty">Projekte folgen.</p>'); secWork.classList.add("is-empty"); }
 cards.forEach((c, i) => c.addEventListener("click", () => openProject(i)));
-const work = { wrote: -1, skew: 0, lastSL: 0, gap: 20, hInput: 0, snapTo: null, idx: -1, n: -1, fill: 0 };
+const work = { wrote: -1, skew: 0, lastSL: 0, gap: 20, hInput: 0, snapTo: null };
 
 function sizeCards() {
-  const meta = $(".arbeiten__meta");
+  // unten so viel Luft wie oben zwischen Fensterrand und Navtext
+  const EDGE = Math.round($(".nav__brand").getBoundingClientRect().top) || 40;
+  document.documentElement.style.setProperty("--edge", EDGE + "px");
   const above = trackWrap.getBoundingClientRect().top - secWork.getBoundingClientRect().top;   // Abschnitt beginnt oben am Bildschirm
   if (VW < 900) {                                    // Handy: Karten füllen den Screen, Text darunter
     track.style.setProperty("--ch", "auto");
@@ -971,19 +1001,19 @@ function sizeCards() {
     for (let pass = 0; pass < 2; pass++) {
       track.style.setProperty("--cw", cw + "px");
       const infoH = Math.max(...cards.map((c) => c.querySelector(".card__info").offsetHeight));
-      const mediaH = VH - edge - meta.offsetHeight - above - infoH;
+      const mediaH = VH - EDGE - above - infoH;
       cw = Math.round(clamp(mediaH * .8, 170, VW * .8));
     }
     track.style.setProperty("--cw", cw + "px");
-    // nachmessen: der Fortschritts-Scroller unten muss im Screen liegen (Text bricht bei schmaleren Karten länger um)
+    // nachmessen: die Karten samt Text müssen in den Screen passen (Text bricht bei schmaleren Karten länger um)
     for (let pass = 0; pass < 4; pass++) {
-      const over = meta.getBoundingClientRect().bottom - secWork.getBoundingClientRect().top - (VH - edge);
+      const over = trackWrap.getBoundingClientRect().bottom - secWork.getBoundingClientRect().top - (VH - EDGE);
       if (over <= 0 || cw <= 150) break;
       cw = Math.max(150, Math.round(cw - over / 1.25 - 4));
       track.style.setProperty("--cw", cw + "px");
     }
   } else {
-    const ch = clamp(VH - above - meta.offsetHeight - 30, 240, 615);
+    const ch = clamp(VH - above - EDGE, 240, 615);
     track.style.setProperty("--ch", ch + "px");
     track.style.setProperty("--cw", Math.round(ch * 400 / 615) + "px");
   }
@@ -991,7 +1021,6 @@ function sizeCards() {
   work.gap = VW < 900 ? 18 : 20;
   track.style.gap = work.gap + "px";
   const cw = parseFloat(track.style.getPropertyValue("--cw")) || 400;
-  layoutDots();
 }
 
 /* FLIP mit Feder-Easing */
@@ -1032,7 +1061,7 @@ function toggleFilter(cat) {
   setTimeout(() => {
     outs.forEach((a) => a.cancel());
     flip(() => { cards.forEach((c) => (c.hidden = !match(c))); }, { stagger: 18 });
-    trackWrap.scrollLeft = 0; work.snapTo = 0; layoutDots();
+    trackWrap.scrollLeft = 0; work.snapTo = 0;
   }, leaving.length ? 170 : 0);
 }
 
@@ -1084,22 +1113,7 @@ function updateCardsIn(dt) {
     if (c._tf !== tf) { c._tf = tf; c.style.transform = tf; c.style.opacity = op; }
   });
 }
-/* Fortschrittslinie ziehen */
-const dotsDrag = { on: false };
-function dotsSeek(e) {
-  const r = dotsEl.getBoundingClientRect();
-  const f = clamp((e.clientX - r.left) / r.width);
-  const max = trackWrap.scrollWidth - trackWrap.clientWidth;
-  const S = stops(), p = clamp(f * S.length - 1, 0, S.length - 1), j0 = Math.floor(p);
-  trackWrap.scrollLeft = clamp(j0 >= S.length - 1 ? S[S.length - 1] : lerp(S[j0], S[j0 + 1], p - j0), 0, max);
-  work.hInput = performance.now(); work.snapTo = null; drag.glide = 0;
-}
-dotsEl.addEventListener("pointerdown", (e) => { dotsDrag.on = true; dotsEl.classList.add("is-drag"); dotsEl.setPointerCapture(e.pointerId); dotsSeek(e); });
-dotsEl.addEventListener("pointermove", (e) => { if (dotsDrag.on) dotsSeek(e); });
-const endDots = () => { if (!dotsDrag.on) return; dotsDrag.on = false; dotsEl.classList.remove("is-drag"); work.hInput = 0; };
-dotsEl.addEventListener("pointerup", endDots); dotsEl.addEventListener("pointercancel", endDots);
-
-/* Punkte: so viele wie sichtbare Projekte, Breite = Grafik-Pille links bis Ideen-Pille rechts */
+/* Einrasten der Kartenreihe */
 function visibleCards() { return cards.filter((c) => !c.hidden); }
 function stops() {                                       // Einrastpositionen: jede Karte links bündig, die letzte rechts bündig
   const max = Math.max(0, trackWrap.scrollWidth - trackWrap.clientWidth), step = cardStep(), s = [];
@@ -1112,38 +1126,6 @@ function stopPos(sl, S) {                                 // kontinuierliche Pos
   return S.length - 1;
 }
 function cardStep() { const v = visibleCards(); return v.length > 1 ? v[1].offsetLeft - v[0].offsetLeft : (v[0]?.offsetWidth || 400) + work.gap; }
-function layoutDots() {
-  const chs = $$("#arbeiten .display .ch");
-  const span = chs.length ? chs[chs.length - 1].getBoundingClientRect().right - chs[0].getBoundingClientRect().left : 400;
-  dotsEl.style.width = Math.max(120, span) + "px";
-  const n = stops().length;                              // Abschnitte = Einrastpositionen
-  if (n !== work.n) {
-    work.n = n; work.idx = -1;
-    $$(".dot", dotsEl).forEach((d) => d.remove());
-    for (let k = 0; k <= n; k++) {
-      const d = document.createElement("button");
-      d.type = "button"; d.className = "dot"; d.setAttribute("aria-label", "Projekt " + (k + 1));
-      d.style.left = (k / Math.max(1, n) * 100) + "%";
-      dotsEl.appendChild(d);
-    }
-  }
-}
-function updateDots(sl, dt) {
-  const S = stops();
-  if (S.length !== work.n) layoutDots();
-  const n = work.n; if (n < 1) return;
-  const pos = stopPos(sl, S);
-  const idx = Math.round(pos);
-  // Fortschrittslinie rastet an den Punkten ein
-  const target = dotsDrag.on ? (pos + 1) / n : (idx + 1) / n;     // erste Ansicht: Strich vom 1. zum 2. Punkt
-  work.fill = dotsDrag.on ? target : damp(work.fill, target, 14, dt);
-  dotsFill.style.width = (work.fill * 100).toFixed(2) + "%";
-  if (idx !== work.idx) {
-    work.idx = idx;
-    $$(".dot", dotsEl).forEach((d, k) => { d.classList.toggle("is-past", k <= idx + 1); d.classList.remove("is-active"); });
-  }
-}
-
 // Touch: natives Wischen der Karten nicht vom Einrasten zurückziehen lassen
 let touchOnTrack = false, touchEndT = -1e9;
 trackWrap.addEventListener("touchstart", () => { touchOnTrack = true; work.snapTo = null; drag.glide = 0; work.hInput = performance.now(); }, { passive: true });
@@ -1163,13 +1145,12 @@ function updateWork(dt) {
   if (Math.abs(drag.glide) > .1) { trackWrap.scrollLeft += drag.glide; drag.glide *= Math.pow(.9, dt * 60); }
   const max = trackWrap.scrollWidth - trackWrap.clientWidth;
   // Karten rasten ein: nach dem Wischen/Ziehen zur nächsten Karte gleiten
-  if (!drag.down && !dotsDrag.on && !touchOnTrack && Math.abs(drag.glide) < 1.2 && performance.now() - work.hInput > 110) {
+  if (!drag.down && !touchOnTrack && Math.abs(drag.glide) < 1.2 && performance.now() - work.hInput > 110) {
     const step = cardStep();
     if (work.snapTo === null) { const S = stops(); work.snapTo = S[Math.round(stopPos(trackWrap.scrollLeft, S))]; }
     const cur = trackWrap.scrollLeft, nx = damp(cur, work.snapTo, 11, dt);
     if (Math.abs(work.snapTo - cur) > .5) { drag.glide = 0; trackWrap.scrollLeft = Math.abs(work.snapTo - nx) < .5 ? work.snapTo : nx; work.wrote = trackWrap.scrollLeft; }
   }
-  updateDots(trackWrap.scrollLeft, dt);
 }
 
 /* =========================================================
@@ -1182,7 +1163,6 @@ wmText.innerHTML = [...wmText.textContent].map((c, i, a) => {
   const k = WM_KERN[(c + (a[i + 1] || "")).toUpperCase()];
   return `<span class="ch"${k ? ` style="margin-right:${k}em"` : ""}>${c === " " ? "&nbsp;" : c}</span>`;
 }).join("");
-const wmChars = $$(".ch", wmText);
 // Impressum beginnt genau auf der Linie von Mail / Instagram / LinkedIn
 function alignLegal() {
   const l = $(".footer__links"), g = $(".footer__legal"); if (!l || !g) return;
@@ -1204,22 +1184,11 @@ function fitWordmark() {
   const w = wmText.scrollWidth;
   wmText.style.fontSize = (100 * (VW - 2 * PAD()) / w) + "px";   // links und rechts derselbe Rand wie alles andere
 }
-let wmHover = false;
-wordmark.addEventListener("pointerenter", () => (wmHover = true));
-wordmark.addEventListener("pointerleave", () => { wmHover = false; wmChars.forEach((c) => c.style.setProperty("--wy", 0)); });
 wordmark.addEventListener("pointermove", (e) => {
   const r = wordmark.getBoundingClientRect();
   wordmark.style.setProperty("--tx", (e.clientX - r.left) + "px");
   wordmark.style.setProperty("--ty", (e.clientY - r.top) + "px");
 });
-function updateWordmark() {
-  if (!wmHover) return;
-  for (const c of wmChars) {
-    const r = c.getBoundingClientRect();
-    const d = (r.left + r.width / 2 - pointer.x) / (VW * .09);
-    c.style.setProperty("--wy", (Math.exp(-d * d) * VW * .012).toFixed(2));
-  }
-}
 wordmark.addEventListener("click", () => Player.open(wmText.getBoundingClientRect()));
 
 /* =========================================================
@@ -1478,17 +1447,23 @@ function fillProject(i) {
   povProject.innerHTML = `
     <div class="split">
       <aside class="split__info">
-        <div class="project__bar" style="--i:0"><button type="button" class="back" data-back aria-label="Alle Arbeiten"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5 5 8l5.5 5.5" /></svg></button><span class="project__year">${esc(P.year)}</span></div>
-        <h1 class="project__title" style="--i:0">${umlTitle(P.title)}</h1>
-        <div class="project__meta" style="--i:1">${(P.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>
-        <p class="project__lead" style="--i:2">${esc(P.short)}</p>
+        <div class="project__top">
+          <div class="project__bar" style="--i:0"><button type="button" class="back" data-back aria-label="Alle Arbeiten"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5 5 8l5.5 5.5" /></svg></button><span class="project__year">${esc(P.year)}</span></div>
+          ${P.cover ? `<figure class="project__hero" style="--i:0"><img src="${esc(P.cover)}" alt="${esc(P.title)}" style="object-position:${esc(P.coverPosition || "50% 50%")}" /></figure>` : ""}
+          <div class="project__intro">
+            <h1 class="project__title" style="--i:0">${umlTitle(P.title)}</h1>
+            <div class="project__meta" style="--i:1">${(P.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+            <p class="project__lead" style="--i:2">${esc(P.short)}</p>
+          </div>
+        </div>
         <div class="project__text" style="--i:3">${md(P.text)}</div>
       </aside>
-      <div class="split__media">${media.map((m, k) => mediaItem(m, k, P)).join("")}</div>
+      <div class="split__media${P.media && P.media.length ? "" : " is-cover-only"}">${media.map((m, k) => mediaItem(m, k, P)).join("")}</div>
     </div>`;
   // Farben des Rahmens aus der Bildwelt (CMS-Palette, sonst Standard)
   POV.pal = (P.palette && P.palette.length >= 4 ? P.palette.slice(0, 4).map(hexToRgb) : PAL_HERO.map((x) => x.slice()));
-  requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
+  requestAnimationFrame(() => { fitTitle(povProject.querySelector(".project__title")); povHeadSize(); });
+  if (document.fonts) document.fonts.ready.then(() => POV.open && povHeadSize());
   document.title = `${P.title} — Pascal Pampel`;
 }
 function openProject(i, { push = true, replace = false } = {}) {
@@ -1540,8 +1515,30 @@ povPanel.addEventListener("scroll", povHeadUpd, { passive: true });
 // Kopfzeile nur so breit wie die Textspalte – die Bilder rechts bleiben frei
 const povHead = $(".pov__head");
 function povHeadSize() {
+  // erstes Bild = Fensterhöhe des Rahmens (oben und unten derselbe Innenabstand); Bildinhalt wird passend beschnitten
+  const pt = parseFloat(getComputedStyle(povProject).paddingTop) || 0;
+  povProject.style.setProperty("--firstH", Math.max(200, povPanel.clientHeight - 2 * pt) + "px");
   const info = povProject.querySelector(".split__info");
   const one = info && getComputedStyle(info.parentElement).gridTemplateColumns.split(" ").length < 2;
+  // Textspalte scrollt mit, bis ihr Ende sichtbar ist – dann bleibt sie stehen, die Bilder laufen weiter
+  // Handy: Titelbild so hoch, dass Pfeil, Bild, Titel, Tags und Kurzbeschreibung genau ins Fenster passen
+  const hero = povProject.querySelector(".project__hero"), top = povProject.querySelector(".project__top");
+  if (hero && top) {
+    if (!one) hero.style.height = "";
+    else {
+      const other = top.offsetHeight - hero.offsetHeight;
+      const avail = povPanel.clientHeight - pt - other - 20;
+      hero.style.height = Math.round(clamp(avail, 140, hero.offsetWidth * 1.4)) + "px";
+    }
+  }
+  if (info) {
+    if (one) info.style.top = "";
+    else {
+      const pr = povPanel.getBoundingClientRect(), ir = info.getBoundingClientRect();
+      const natural = ir.top - pr.top + povPanel.scrollTop;
+      info.style.top = Math.round(Math.min(natural, povPanel.clientHeight - info.offsetHeight - 16)) + "px";
+    }
+  }
   povHead.style.width = info && !one ? Math.round(info.getBoundingClientRect().right - povPanel.getBoundingClientRect().left + parseFloat(getComputedStyle(povHead).paddingLeft) * .5) + "px" : "";
 }
 addEventListener("resize", () => { if (POV.open) povHeadSize(); });   // auch für die Pfeile im Projektinhalt
@@ -1627,7 +1624,7 @@ function onResize() {
   VW = vpW(); VH = innerHeight; _pad = null;
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   heroGL.resize(); footGL.resize(); if (POV.gl) POV.gl.resize();
-  sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); cacheNav(); cacheGeo();
+  sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); sizeLeistBody(); fitUeber(); cacheNav(); cacheGeo();
   chips.forEach((c) => (c.last = ""));
 }
 addEventListener("resize", onResize);
@@ -1644,8 +1641,8 @@ function watchPerf(dt) {
   const avg = perf.acc / perf.n; perf.acc = 0; perf.n = 0;
   if (SCY >= HERO_H) { perf.slow = 0; return; }
   const base = perf.base || (perf.base = heroGL.scale);
-  if (avg > 1 / 40) {
-    if (++perf.slow >= 2 && heroGL.scale > base * .8 + .001) { heroGL.scale = Math.max(base * .8, heroGL.scale * .9); heroGL.resize(); perf.slow = 0; }
+  if (avg > 1 / 35) {                                          // nur bei deutlichem, anhaltendem Ruckeln (3 Messfenster) – und nur leicht
+    if (++perf.slow >= 3 && heroGL.scale > base * .88 + .001) { heroGL.scale = Math.max(base * .88, heroGL.scale * .94); heroGL.resize(); perf.slow = 0; }
   } else {
     perf.slow = 0;
     if (avg < 1 / 55 && heroGL.scale < base - .001) { heroGL.scale = Math.min(base, heroGL.scale / .9); heroGL.resize(); }
@@ -1687,7 +1684,7 @@ function tick(now) {
 
 function start() {
   onResize(); SNAP.rest = scrollY;
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitOrbitText(); fitWordmark(); alignLegal(); cacheNav(); layoutDots(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitOrbitText(); fitWordmark(); alignLegal(); cacheNav(); });
   requestAnimationFrame(tick);
   // erst einblenden, wenn Schrift geladen und der Hintergrund schon gezeichnet ist – dann startet auch das Intro
   let shown = false;
@@ -1696,7 +1693,7 @@ function start() {
       document.documentElement.classList.add("is-ready"); document.body.classList.add("is-loaded");
     }));
   };
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(reveal);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitUeber(); reveal(); });
   setTimeout(reveal, 900);   // spätestens dann, falls eine Schrift hängt
   // Kartenbilder schon vorab im Leerlauf dekodieren – sonst passiert das genau beim ersten Scrollen zu „Arbeiten"
   const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
