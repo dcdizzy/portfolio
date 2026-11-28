@@ -526,7 +526,10 @@ function orbitRect() {
 const hist = (m, ...a) => { try { history[m](...a); } catch (e) {} };
 const lockScroll = (on) => document.documentElement.classList.toggle("no-scroll", on);
 const SNAP = { pts: [], free: [], from: 0, to: 0, t0: 0, dur: 0, m0: 0, on: false, timer: 0, rest: 0 };
-const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - VH);
+// echtes Scroll-Ende: Firefox (Handy) legt seine Leiste über die Seite – das Layout-Fenster (innerHeight) ist dort höher als der sichtbare Teil
+const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - Math.max(VH, innerHeight));
+// Firefox am Handy: Einrasten mit dem browsereigenen weichen Scrollen (läuft auf der Grafikkarte, ruckelt nicht wie Scroll-Schritte per Skript)
+const NATIVE_GLIDE = /Firefox\//.test(navigator.userAgent) && matchMedia("(pointer: coarse)").matches;
 const easeGlide = (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;   // easeInOutCubic
 // mit Schwung: Hermite-Kurve (Startsteigung = Geschwindigkeit beim Loslassen, weich bis zum Stillstand)
 const glideCurve = (u, m0) => m0 > 0 ? (u * u * u - 2 * u * u + u) * m0 + (3 * u * u - 2 * u * u * u) : easeGlide(u);
@@ -538,15 +541,20 @@ function glideTo(y, { minDur = 0, v0 = 0, dur = 0, m0min = 0 } = {}) {
   SNAP.dur = dur || Math.max(minDur, TOUCHUI ? 560 + 430 * Math.min(1.6, d / VH) : 480 + 330 * Math.min(1.6, d / VH));
   SNAP.m0 = clamp(Math.max(v0 * SNAP.dur / dist, m0min), 0, 2.2);
   SNAP.t0 = performance.now(); SNAP.on = true;
+  if (NATIVE_GLIDE) { SNAP.native = true; window.scrollTo({ top: SNAP.to, behavior: "smooth" }); }
 }
 function stepScroll(now) {          // läuft am Anfang jedes Frames, vor dem Lesen von scrollY – genau ein Schreibzugriff pro Bild
   if (TOUCH.drag) { if (TOUCH.want !== TOUCH.wrote) { TOUCH.wrote = TOUCH.want; window.scrollTo(0, TOUCH.want); } return; }
   if (!SNAP.on) return;
+  if (SNAP.native) {   // Browser gleitet selbst – nur auf das Ankommen warten
+    if (Math.abs(scrollY - SNAP.to) < 1.5 || now - SNAP.t0 > SNAP.dur + 1200) { SNAP.on = SNAP.native = false; SNAP.rest = Math.round(scrollY); }
+    return;
+  }
   const t = Math.min(1, (now - SNAP.t0) / SNAP.dur);
   window.scrollTo(0, Math.round(SNAP.from + (SNAP.to - SNAP.from) * glideCurve(t, SNAP.m0)));
   if (t >= 1) { SNAP.on = false; SNAP.rest = SNAP.to; }
 }
-const stopGlide = () => { SNAP.on = false; };
+const stopGlide = () => { if (SNAP.on && SNAP.native) window.scrollTo({ top: scrollY, behavior: "instant" }); SNAP.on = SNAP.native = false; };
 const scrollToY = (y, { immediate = false } = {}) => {
   if (immediate) { stopGlide(); window.scrollTo(0, y); SNAP.rest = y; } else glideTo(y, { minDur: TOUCHUI ? 800 : 650 });
 };
@@ -664,7 +672,7 @@ $$(".nav__links a, .nav__icons a").forEach((a) => a.addEventListener("click", (e
   e.preventDefault();
   if (POV.open) { POV.open = true; closeProject({ fromHistory: true }); hist("replaceState", null, "", location.pathname); }
   const t = $(a.getAttribute("href"));
-  const y = t.id === "kontakt" ? document.documentElement.scrollHeight - VH : docTop(t);
+  const y = t.id === "kontakt" ? maxScroll() : docTop(t);
   scrollToY(y);
 }));
 const navSecs = ["leistungen", "arbeiten", "ueber", "kontakt"].map((id) => $("#" + id));
@@ -855,7 +863,10 @@ function sizeSlots() {
   const gc = parseFloat(getComputedStyle($("#slotCircles")).columnGap) || 14;
   const gp = parseFloat(getComputedStyle($("#slotPills")).columnGap) || 10;
   document.documentElement.style.setProperty("--cs", Math.floor(Math.min(131, (avail - 4 * gc) / 5)) + "px");
-  document.documentElement.style.setProperty("--pw", Math.floor(Math.min(143, (avail - 4 * gp) / 5)) + "px");
+  const pw = Math.floor(Math.min(143, (avail - 4 * gp) / 5));
+  document.documentElement.style.setProperty("--pw", pw + "px");
+  // Schriftgröße der Filterpillen (wie in updateChips) → Kategorie-Pillen der Karten gleich groß
+  document.documentElement.style.setProperty("--pillfs", Math.min(18, pw / (VW < 600 ? 5.1 : 6.6)).toFixed(1) + "px");
 }
 const lerpRect = (a, b, t) => ({ left: lerp(a.left, b.left, t), top: lerp(a.top, b.top, t), width: lerp(a.width, b.width, t), height: lerp(a.height, b.height, t) });
 
@@ -1586,10 +1597,10 @@ function povHeadSize() {
     else {
       const pr = povPanel.getBoundingClientRect(), ir = info.getBoundingClientRect();
       const natural = ir.top - pr.top + povPanel.scrollTop;
-      // … aber mindestens so weit, dass die Überschrift unter der Kopfzeile verschwindet – sonst erscheint der kleine Titel bei kurzen Texten nie
-      const t = info.querySelector(".project__title");
-      const tb = t ? t.getBoundingClientRect().bottom - ir.top : 0;
-      info.style.top = Math.round(Math.min(natural, povPanel.clientHeight - info.offsetHeight - 16, 64 - tb - 4)) + "px";
+      // … aber immer mindestens so weit, dass Titel, Tags und Kurzinfo unter der Kopfzeile verschwinden und der Fließtext direkt darunter steht
+      const t = info.querySelector(".project__text") || info.querySelector(".project__lead");
+      const tb = t ? (t.classList.contains("project__text") ? t.getBoundingClientRect().top - ir.top - 24 : t.getBoundingClientRect().bottom - ir.top) : 0;
+      info.style.top = Math.round(Math.min(natural, povPanel.clientHeight - info.offsetHeight - 16, 64 - tb)) + "px";
     }
   }
   povHead.style.width = info && !one ? Math.round(info.getBoundingClientRect().right - povPanel.getBoundingClientRect().left + parseFloat(getComputedStyle(povHead).paddingLeft) * .5) + "px" : "";
@@ -1676,6 +1687,7 @@ function onResize() {
   if (POV.open) requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
   VW = vpW(); VH = vpH(); _pad = null;
   document.documentElement.style.setProperty("--vh", VH + "px");   // sichtbare Fensterhöhe (Handy: mit/ohne Browserleiste)
+  document.documentElement.style.setProperty("--tb", Math.max(0, Math.round(innerHeight - VH)) + "px");   // von der Browserleiste verdeckter Streifen unten (Firefox)
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   heroGL.resize(); footGL.resize(); if (POV.gl) POV.gl.resize();
   sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); sizeLeistBody(); fitUeber(); cacheNav(); cacheGeo();

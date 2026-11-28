@@ -852,3 +852,13 @@ html.no-scroll { overflow: hidden; }
 .project__meta .tag { display: inline-flex; align-items: center; line-height: 1; padding: 6px 12px 7px; }
 /* Überschriften: nur an Wortfugen (weiches Trennzeichen) umbrechen; passt ein Teil trotzdem nicht, verkleinert fitTitle */
 .pov .project .project__title, .card__title { -webkit-hyphens: manual; hyphens: manual; overflow-wrap: normal; }
+
+/* v103 */
+/* Firefox Handy: Seite reicht hinter die Browserleiste → Footer um diesen Streifen höher, Animation endet über der Leiste */
+.footer { min-height: calc(var(--vh, 100svh) + var(--tb, 0px)); padding-bottom: var(--tb, 0px); }
+/* Nav auf eigener Ebene (Firefox hat Name/Icons ganz unten teils nicht neu gezeichnet) */
+.nav { will-change: transform; }
+body.is-loaded .nav__brand, body.is-loaded .nav__links, body.is-loaded .nav__icons { transform: translateZ(0); }
+/* Kategorie-Pillen auf den Karten = Filterpillen (Schrift und Höhe) */
+.card__tags span { display: inline-flex; align-items: center; height: 33px; padding: 0 1em .1em; font-size: var(--pillfs, 18px); line-height: 1; }
+@media (max-width: 900px) { .card__tags span { height: 27px; } }
