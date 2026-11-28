@@ -53,7 +53,9 @@ const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
 // Breite immer vom sichtbaren Bereich (clientWidth), nie innerWidth: am Handy kann innerWidth durch zu breiten Inhalt
 // mitwachsen → alles wird nach dieser falschen Breite bemessen und die Seite lässt sich seitlich verschieben
 const vpW = () => document.documentElement.clientWidth || innerWidth;
-let VW = vpW(), VH = innerHeight, _pad = null;
+// sichtbare Höhe: am Handy kann die Browserleiste über der Seite liegen → die kleinere von beiden nehmen
+const vpH = () => Math.round(Math.min(innerHeight, (window.visualViewport && visualViewport.height) || innerHeight));
+let VW = vpW(), VH = vpH(), _pad = null;
 // Höhen zwischenspeichern: im Frame-Loop nie offsetHeight lesen (würde nach Schreibzugriffen ein Layout erzwingen)
 let HERO_H = 0, NAV_H = 0, SCY = 0;   // SCY: Scrollposition einmal pro Frame gelesen
 const PAD = () => (_pad ??= parseFloat(getComputedStyle($(".nav")).paddingLeft) || 80);
@@ -964,7 +966,9 @@ function updateChips(dt) {
    10. ARBEITEN · Reihe (optional horizontal) / Raster + Filter
    ========================================================= */
 // BN Canyon hat keine Umlaute → Grundbuchstabe + eigene Punkte (wie bei „Über mich")
-const umlTitle = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])
+// Lange Komposita nur an der Wortfuge trennen („Entspannungs-karten" statt „Entspan-nungskarten")
+const fugen = (t) => String(t).replace(/(ungs|heits|keits|schafts|tions|täts|lings)(?=[a-zäöüß]{3,})/gi, "$1\u00AD");
+const umlTitle = (t) => fugen(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])
   .replace(/[ÄÖÜäöü]/g, (c) => `<span class="uml">${c.normalize("NFD")[0]}</span>`);
 // Überschriften nie abschneiden: ist ein Wort breiter als der Platz, wird die Schrift passend verkleinert
 function fitTitle(el) {
@@ -1246,6 +1250,8 @@ const Player = (() => {
 
   function open(from) {
     if (isOpen && !win.hidden) { win.classList.remove("is-inactive"); return; }
+    // Handy: Video direkt im Klick einmal starten (sonst blockiert der Browser das spätere Abspielen mit Ton)
+    try { video.muted = false; const pr = video.play(); if (pr) pr.then(() => { if (state !== "playing") video.pause(); }).catch(() => {}); } catch (e) {}
     win.hidden = false; win.style.visibility = "hidden";
     const to = winRect(); place();
     win.hidden = true; win.style.visibility = "";
@@ -1463,7 +1469,7 @@ function fillProject(i) {
         </div>
         <div class="project__text" style="--i:3">${md(P.text)}</div>
       </aside>
-      <div class="split__media${P.media && P.media.length ? "" : " is-cover-only"}">${media.map((m, k) => mediaItem(m, k, P)).join("")}</div>
+      <div class="split__media${P.media && P.media.length ? "" : " is-cover-only"}">${P.cover && P.media && P.media.length ? `<figure class="media__item is-cover" style="--i:1"><img src="${esc(P.cover)}" alt="${esc(P.title)}" style="object-position:${esc(P.coverPosition || "50% 50%")}" /></figure>` : ""}${media.map((m, k) => mediaItem(m, k, P)).join("")}</div>
     </div>`;
   // Farben des Rahmens aus der Bildwelt (CMS-Palette, sonst Standard)
   if (P.palette && P.palette.length >= 4) POV.pal = P.palette.slice(0, 4).map(hexToRgb);
@@ -1580,7 +1586,10 @@ function povHeadSize() {
     else {
       const pr = povPanel.getBoundingClientRect(), ir = info.getBoundingClientRect();
       const natural = ir.top - pr.top + povPanel.scrollTop;
-      info.style.top = Math.round(Math.min(natural, povPanel.clientHeight - info.offsetHeight - 16)) + "px";
+      // … aber mindestens so weit, dass die Überschrift unter der Kopfzeile verschwindet – sonst erscheint der kleine Titel bei kurzen Texten nie
+      const t = info.querySelector(".project__title");
+      const tb = t ? t.getBoundingClientRect().bottom - ir.top : 0;
+      info.style.top = Math.round(Math.min(natural, povPanel.clientHeight - info.offsetHeight - 16, 64 - tb - 4)) + "px";
     }
   }
   povHead.style.width = info && !one ? Math.round(info.getBoundingClientRect().right - povPanel.getBoundingClientRect().left + parseFloat(getComputedStyle(povHead).paddingLeft) * .5) + "px" : "";
@@ -1600,7 +1609,7 @@ function lbShow(i) {
   requestAnimationFrame(() => requestAnimationFrame(() => fig.classList.add("is-in")));
 }
 function lbOpen(target) {
-  LB.items = [...povProject.querySelectorAll(".split__media img, .split__media video")];
+  LB.items = [...povProject.querySelectorAll(".split__media img, .split__media video")].filter((el) => el.offsetParent);   // ausgeblendetes Titelbild (Handy) nicht doppelt
   const i = LB.items.indexOf(target); if (i < 0) return;
   LB.open = true; LB.el.hidden = false;
   pov.classList.add("lb-open");
@@ -1665,7 +1674,7 @@ const footHue = { v: 0 };
 
 function onResize() {
   if (POV.open) requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
-  VW = vpW(); VH = innerHeight; _pad = null;
+  VW = vpW(); VH = vpH(); _pad = null;
   document.documentElement.style.setProperty("--vh", VH + "px");   // sichtbare Fensterhöhe (Handy: mit/ohne Browserleiste)
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   heroGL.resize(); footGL.resize(); if (POV.gl) POV.gl.resize();
@@ -1673,6 +1682,8 @@ function onResize() {
   chips.forEach((c) => (c.last = ""));
 }
 addEventListener("resize", onResize);
+// Handy: Browserleiste ein-/ausgeblendet → neue sichtbare Höhe übernehmen
+if (window.visualViewport) visualViewport.addEventListener("resize", () => { if (Math.abs(vpH() - VH) > 2) onResize(); });
 
 let frameNo = 0;
 const perf = { acc: 0, n: 0, slow: 0, base: 0 };

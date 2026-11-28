@@ -307,7 +307,7 @@ body:not(.is-loaded) .nav__links, body:not(.is-loaded) .nav__icons { opacity: 0;
   .card__info { top: 0; display: flex; flex-direction: column; justify-content: flex-end; }
   .card__year { position: absolute; top: 24px; right: 26px; margin: 0; }
 }
-.card__title { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 2.5vw, 36px); line-height: 1.02; text-transform: uppercase; margin-bottom: 12px; overflow-wrap: normal; }
+.card__title { font-family: var(--display); font-weight: 400; font-size: clamp(22px, 1.75vw, 27px); line-height: 1.04; text-transform: uppercase; margin-bottom: 12px; overflow-wrap: normal; -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 8 4 4; }
 .card__desc { font-size: 15px; line-height: 1.42; color: rgba(255,255,255,.86);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }   /* Kurzbeschreibung: max. 3 Zeilen */
 .card__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
@@ -589,7 +589,7 @@ body.pov-open .nav::before { opacity: 0; }
 
 .project__title {
   font-family: var(--display); font-weight: 400; text-transform: uppercase;
-  font-size: clamp(36px, 4.4vw, 76px); line-height: .95; letter-spacing: .01em;
+  font-size: clamp(26px, 2.3vw, 42px); line-height: 1; letter-spacing: .01em;
 }
 .project__year { font-size: 12px; letter-spacing: 2.4px; text-transform: uppercase; }
 .project__title { margin-top: calc(var(--u) * 1.4); }
@@ -840,3 +840,15 @@ html.no-scroll { overflow: hidden; }
 
 /* Abstand Inhalt → unterer Fensterrand = Abstand oberer Rand → Navtext (--edge setzt das Skript) */
 .pov__panel { bottom: var(--edge, 59px); }
+
+/* Nav-Inhalt immer über der Abdeckfläche der Nav (Handy-Browser malten ihn sonst teils darunter) */
+.nav__brand, .nav__links, .nav__icons, .nav__line { position: relative; z-index: 1; }
+
+/* v101 */
+/* Desktop: Titelbild ist das erste große Bild rechts; am Handy steht es schon oben als Hero */
+@media (max-width: 900px) { .split__media > .media__item.is-cover { display: none; } }
+/* Text in Kreisen/Pillen und Tag-Bubble optisch mittig (Satoshi sitzt etwas tief) */
+.chip .chip__label { translate: -50% calc(-50% - .05em); }
+.project__meta .tag { display: inline-flex; align-items: center; line-height: 1; padding: 6px 12px 7px; }
+/* Überschriften: nur an Wortfugen (weiches Trennzeichen) umbrechen; passt ein Teil trotzdem nicht, verkleinert fitTitle */
+.pov .project .project__title, .card__title { -webkit-hyphens: manual; hyphens: manual; overflow-wrap: normal; }
