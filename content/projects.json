@@ -66,8 +66,19 @@
     "tags": [
       "Grafik"
     ],
+    "cover": "assets/img/exhibeat-titelbild.jpg",
     "short": "Werbemittel für die audiovisuelle Ausstellungsreihe im Raum Hof. Psychedelische Texturen im Kontrast zu klarem Symbolismus.",
-    "text": "ExhiBeat ist eine Ausstellungsreihe im Raum Hof, bei der Kunst und Musik zusammenkommen. Die Bildmarke verbindet beides: ein Auge zum Sehen, eine Schallplatte zum Hören. Auch die Wortmarke spielt mit diesem Gegensatz.\n\nEine reduzierte, fast brutalistische Basis trifft auf organische, psychedelische Texturen. Bei der Veranstaltung stand ich außerdem selbst auf der Bühne, als „Pampelmann“. Auch da ging es um Kontraste: Synthesizer und Drum-Machine-Patterns, dazu improvisierte E-Gitarre."
+    "text": "ExhiBeat ist eine Ausstellungsreihe im Raum Hof, bei der Kunst und Musik zusammenkommen. Die Bildmarke verbindet beides: ein Auge zum Sehen, eine Schallplatte zum Hören. Auch die Wortmarke spielt mit diesem Gegensatz.\n\nEine reduzierte, fast brutalistische Basis trifft auf organische, psychedelische Texturen. Bei der Veranstaltung stand ich außerdem selbst auf der Bühne, als „Pampelmann“. Auch da ging es um Kontraste: Synthesizer und Drum-Machine-Patterns, dazu improvisierte E-Gitarre.",
+    "media": [
+      {
+        "src": "assets/img/exhibeat-1-plakat-vol1.jpg",
+        "caption": "Plakat Vol. 1"
+      },
+      {
+        "src": "assets/img/exhibeat-2-plakat-vol2.jpg",
+        "caption": "Plakat Vol. 2"
+      }
+    ]
   },
   {
     "title": "Alles nur Schein",
