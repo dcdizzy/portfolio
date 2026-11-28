@@ -396,7 +396,7 @@ const PAL_HERO = [[.094, .245, .14], [.18, .37, .14], [.38, .39, .12], [.54, .35
 const PAL_FOOT = [[.075, .10, .30], [.18, .27, .56], [.40, .23, .66], [.68, .19, .45]];    // Navy · Figma-Blau · Violett · Magenta
 const heroGL = new FlowGL($("#heroGL"), { palette: PAL_HERO, scale: window.__hs || .62, zoom: 2.4, trackEl: heroEl });
 const footGL = new FlowGL($("#footGL"), { palette: PAL_FOOT, scale: .62, zoom: 2.4, trackEl: footStrip, interactive: false });
-footGL.refH = () => Math.min(heroEl.clientHeight, VW * (window.__fr || .625));   // Musterdichte wie am Desktop-Footer (1440×900), auch auf schmalen Bildschirmen
+footGL.refH = () => heroEl.clientHeight;   // Muster exakt so groß wie oben im Hero (auch am Handy)
 
 /* Grain-Kachel einmal erzeugen und pro Bild zufällig verschieben */
 (function makeGrain() {
@@ -647,8 +647,9 @@ let cacheQ = 0;
 new ResizeObserver(() => { if (!cacheQ) cacheQ = requestAnimationFrame(() => { cacheQ = 0; cacheNav(); }); }).observe(document.body);
 function updateNav() {
   const hb = HERO_H - SCY, nh = NAV_H || (NAV_H = nav.offsetHeight);
-  const cut = clamp(hb, 0, nh);
-  if (cut !== navCut) { navCut = cut; nav.style.setProperty("--navcut", cut + "px"); }
+  // über dem Hero ganz aus (nicht „Navhöhe px“ – die echte Höhe hat Nachkommastellen → sonst bleibt ein dunkler Haarstrich)
+  const cut = hb >= nh - .5 ? -1 : clamp(hb, 0, nh);
+  if (cut !== navCut) { navCut = cut; nav.style.setProperty("--navcut", cut < 0 ? "calc(100% + 2px)" : cut + "px"); }
   let cur = null;
   navTops.forEach((t, i) => { if (t - SCY < VH * .45) cur = navSecs[i].id; });
   navLinks.forEach((a) => a.classList.toggle("is-active", a.dataset.sec === cur));
@@ -1142,6 +1143,7 @@ wmText.innerHTML = [...wmText.textContent].map((c, i, a) => {
 // Impressum beginnt genau auf der Linie von Mail / Instagram / LinkedIn
 // Lage im Layout, unabhängig von Animationen (transform) – sonst springt beim Laden etwas
 const layoutLeft = (el) => { let x = 0; for (; el; el = el.offsetParent) x += el.offsetLeft; return x; };
+const layoutTop = (el) => { let y = 0; for (; el; el = el.offsetParent) y += el.offsetTop; return y; };   // ohne Transformationen (Einblend-Animationen)
 function alignLegal() {
   const l = $(".footer__links"), g = $(".footer__legal"); if (!l || !g) return;
   // Desktop: Kontaktangaben (und die Zeile unter dem Namen) beginnen genau unter „Leistungen" in der Nav
@@ -1154,7 +1156,9 @@ function alignLegal() {
   g.style.setProperty("--legx", x > 20 ? x.toFixed(1) + "px" : "auto");   // Handy: Links stehen links → normal verteilen
   // Animation unten so hoch wie oben der Abstand vom Fensterrand bis zur Nav-Linie
   const line = $(".nav__line");
-  if (line) { let y = 0; for (let e = line; e; e = e.offsetParent) y += e.offsetTop; document.documentElement.style.setProperty("--striph", Math.round(y + line.offsetHeight) + "px"); }
+  // Handy: so hoch wie der Abstand vom oberen Rand des großen Namens bis zum Beginn der Animation
+  if (COARSE) document.documentElement.style.setProperty("--striph", Math.round(layoutTop(footStrip) - layoutTop(wmText)) + "px");
+  else if (line) { let y = 0; for (let e = line; e; e = e.offsetParent) y += e.offsetTop; document.documentElement.style.setProperty("--striph", Math.round(y + line.offsetHeight) + "px"); }
 }
 function fitWordmark() {
   wmText.style.fontSize = "100px";

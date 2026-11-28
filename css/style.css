@@ -871,5 +871,13 @@ body.is-loaded .nav__brand, body.is-loaded .nav__links, body.is-loaded .nav__ico
   .footer { scroll-snap-align: end; scroll-snap-stop: always; }
   /* Footer: feste Höhe mit eingeblendeter Leiste; unten deutlich mehr Animation (hochkant ist Platz) */
   .footer { min-height: 100svh; padding-bottom: 0; padding-top: max(120px, 26svh); }
-  .footer__strip { height: max(var(--striph, 70px), 20svh); }
+  .footer__strip { height: var(--striph, 90px); }
 }
+
+/* v106 – Handy: Logo in der Pille kleiner */
+@media (max-width: 600px) { .hero__logo { width: 34px; height: 30.5px; margin: -15.25px 0 0 -17px; } }
+/* v107 – Handy: Logo wächst mit der Breite (bei 600px ≈ Desktop-Größe) */
+@media (max-width: 600px) { .hero__logo { --lw: clamp(30px, 9.2vw, 55px); width: var(--lw); height: calc(var(--lw) * .897); margin: calc(var(--lw) * -.4485) 0 0 calc(var(--lw) * -.5); } }
+
+/* v109 – keine Kategorie-Pillen auf den Karten (steht schon in der Filterauswahl) */
+.card__tags { display: none; }
