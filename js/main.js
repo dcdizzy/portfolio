@@ -54,7 +54,12 @@ const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
 // mitwachsen → alles wird nach dieser falschen Breite bemessen und die Seite lässt sich seitlich verschieben
 const vpW = () => document.documentElement.clientWidth || innerWidth;
 // sichtbare Höhe: am Handy kann die Browserleiste über der Seite liegen → die kleinere von beiden nehmen
-const vpH = () => Math.round(Math.min(innerHeight, (window.visualViewport && visualViewport.height) || innerHeight));
+// Handy (Touch): feste Höhe = Fenster MIT eingeblendeter Browserleiste (100svh). Bleibt beim Ein-/Ausblenden der Leiste gleich →
+// nichts wird während des Scrollens neu vermessen (das hat geruckelt)
+const COARSE = matchMedia("(pointer: coarse)").matches;
+const svhProbe = COARSE ? Object.assign(document.createElement("div"), { style: "position:fixed;left:0;top:0;width:0;height:100svh;visibility:hidden;pointer-events:none" }) : null;
+if (svhProbe) document.documentElement.appendChild(svhProbe);
+const vpH = () => COARSE ? (svhProbe.offsetHeight || innerHeight) : Math.round(Math.min(innerHeight, (window.visualViewport && visualViewport.height) || innerHeight));
 let VW = vpW(), VH = vpH(), _pad = null;
 // Höhen zwischenspeichern: im Frame-Loop nie offsetHeight lesen (würde nach Schreibzugriffen ein Layout erzwingen)
 let HERO_H = 0, NAV_H = 0, SCY = 0;   // SCY: Scrollposition einmal pro Frame gelesen
@@ -556,7 +561,9 @@ function stepScroll(now) {          // läuft am Anfang jedes Frames, vor dem Le
 }
 const stopGlide = () => { if (SNAP.on && SNAP.native) window.scrollTo({ top: scrollY, behavior: "instant" }); SNAP.on = SNAP.native = false; };
 const scrollToY = (y, { immediate = false } = {}) => {
-  if (immediate) { stopGlide(); window.scrollTo(0, y); SNAP.rest = y; } else glideTo(y, { minDur: TOUCHUI ? 800 : 650 });
+  if (immediate) { stopGlide(); window.scrollTo({ top: y, behavior: "instant" }); SNAP.rest = y; }
+  else if (COARSE) window.scrollTo({ top: y, behavior: "smooth" });   // Handy: Browser scrollt und rastet selbst ein
+  else glideTo(y, { minDur: 650 });
 };
 function snapPoints() {             // Abschnittsanfänge; Abschnitte höher als der Bildschirm sind innen frei scrollbar
   const max = maxScroll(), pts = [], free = [];
@@ -576,6 +583,7 @@ const scrollLocked = () => POV.open || document.documentElement.classList.contai
 /* ---------- Desktop: Rad / Trackpad / Tasten (nativ) ---------- */
 function settle() {
   SNAP.timer = 0;
+  if (COARSE) return;   // Handy: Einrasten macht CSS (scroll-snap)
   if (TOUCH.drag || SNAP.on || scrollLocked() || !SNAP.pts.length) return;
   const y = scrollY;
   if (inFree(y)) { SNAP.rest = y; return; }
@@ -588,7 +596,7 @@ function settle() {
   glideTo(target);
 }
 addEventListener("scroll", () => {
-  if (SNAP.on || TOUCH.drag) return;   // eigenes Gleiten/Ziehen – abgebrochen wird nur durch echte Eingaben
+  if (COARSE || SNAP.on || TOUCH.drag) return;   // eigenes Gleiten/Ziehen – abgebrochen wird nur durch echte Eingaben
   clearTimeout(SNAP.timer); SNAP.timer = setTimeout(settle, 80);
 }, { passive: true });
 addEventListener("pointerdown", (e) => { if (SNAP.on && e.pointerType === "mouse" && e.target === document.documentElement) stopGlide(); }, { passive: true });
@@ -608,59 +616,8 @@ addEventListener("keydown", (e) => { if (SNAP.on && /^(Arrow|Page|Home|End| )/.t
 const TOUCHUI = matchMedia("(pointer: coarse)").matches;
 const TOUCH = { on: false, drag: false, axis: 0, x0: 0, y0: 0, s0: 0, want: 0, wrote: -1, track: false, hist: [] };
 const SKIP_TOUCH = ".w98, .rp-vol, .pov, .lb, input, textarea, select";
-if (TOUCHUI) {
-  addEventListener("touchstart", (e) => {
-    TOUCH.on = false; TOUCH.drag = false;
-    if (e.touches.length !== 1 || scrollLocked() || e.target.closest(SKIP_TOUCH)) return;
-    const t = e.touches[0];
-    stopGlide(); clearTimeout(SNAP.timer);
-    Object.assign(TOUCH, { on: true, axis: 0, x0: t.clientX, y0: t.clientY, s0: scrollY, want: scrollY, wrote: -1,
-      track: !!e.target.closest("#trackWrap"), hist: [[performance.now(), scrollY]] });
-  }, { passive: true });
-  addEventListener("touchmove", (e) => {
-    if (!TOUCH.on) return;
-    if (e.touches.length !== 1) { TOUCH.on = TOUCH.drag = false; return; }   // Zoomen mit zwei Fingern bleibt nativ
-    const t = e.touches[0], dx = t.clientX - TOUCH.x0, dy = t.clientY - TOUCH.y0;
-    if (!TOUCH.axis) {
-      // Auf der Kartenreihe erst die Richtung abwarten (waagerecht = Karten wischen, nativ)
-      if (TOUCH.track && Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
-      TOUCH.axis = TOUCH.track && Math.abs(dx) > Math.abs(dy) ? 2 : 1;
-      if (TOUCH.axis === 1) TOUCH.drag = true;
-    }
-    if (TOUCH.axis !== 1) return;
-    if (e.cancelable) e.preventDefault();
-    TOUCH.want = Math.round(clamp(TOUCH.s0 - dy, 0, maxScroll()));
-    const now = performance.now(), H = TOUCH.hist; H.push([now, TOUCH.want]);
-    while (H.length > 2 && now - H[0][0] > 90) H.shift();
-  }, { passive: false });
-  const release = () => {
-    if (!TOUCH.on) return;
-    const wasDrag = TOUCH.drag; TOUCH.on = TOUCH.drag = false;
-    if (!wasDrag || scrollLocked() || !SNAP.pts.length) return;
-    // Geschwindigkeit der letzten ~90 ms (px/ms, positiv = nach unten)
-    const H = TOUCH.hist, now = performance.now(), [t0, y0] = H[0];
-    let v = now - H[H.length - 1][0] > 70 ? 0 : (TOUCH.want - y0) / Math.max(16, now - t0);
-    v = clamp(v, -4, 4);
-    const y = TOUCH.want, zone = inFree(y);
-    // im hohen Abschnitt: kurzer, natürlicher Schwung (bremst gleichmäßig ab)
-    if (zone && Math.abs(v) > .08) {
-      const proj = y + v * 300;
-      if (proj > zone[0] && proj < zone[1]) { const d = Math.abs(proj - y); glideTo(proj, { v0: v, dur: clamp(2 * d / Math.abs(v), 250, 900) }); return; }
-      const end = v > 0 ? zone[1] : zone[0]; glideTo(end, { v0: v }); return;
-    }
-    if (zone) { SNAP.rest = y; return; }
-    // sonst: höchstens ein Abschnitt weiter – Richtung aus Schwung oder Strecke
-    const moved = y - TOUCH.s0, dir = Math.abs(v) > .25 ? Math.sign(v) : Math.abs(moved) > Math.min(70, VH * .08) ? Math.sign(moved) : 0;
-    let target = dir ? nextPt(y, dir) : nearPt(y);
-    if (target === undefined) target = nearPt(y);
-    const same = Math.sign(target - y) === Math.sign(v), dd = Math.abs(target - y);
-    // schneller Wisch → kürzere Dauer, damit die Seite mit dem Finger-Tempo weiterläuft statt abzubremsen
-    const dur = same && Math.abs(v) > .15 ? clamp(2 * dd / Math.abs(v), 320, 560 + 430 * Math.min(1.6, dd / VH)) : 0;
-    glideTo(target, { v0: same ? v : 0, m0min: .6, dur });   // ohne zähen Anlauf
-  };
-  addEventListener("touchend", (e) => { if (!e.touches.length) release(); }, { passive: true });
-  addEventListener("touchcancel", release, { passive: true });
-}
+// Handy: kein eigenes Finger-Scrollen mehr – der Browser scrollt nativ (flüssig, Browserleiste blendet normal ein/aus),
+// das Einrasten an den Abschnitten übernimmt CSS scroll-snap
 const docTop = (el) => el.getBoundingClientRect().top + scrollY;
 
 /* =========================================================
@@ -1685,17 +1642,18 @@ const footHue = { v: 0 };
 
 function onResize() {
   if (POV.open) requestAnimationFrame(() => fitTitle(povProject.querySelector(".project__title")));
-  VW = vpW(); VH = vpH(); _pad = null;
-  document.documentElement.style.setProperty("--vh", VH + "px");   // sichtbare Fensterhöhe (Handy: mit/ohne Browserleiste)
-  document.documentElement.style.setProperty("--tb", Math.max(0, Math.round(innerHeight - VH)) + "px");   // von der Browserleiste verdeckter Streifen unten (Firefox)
+  VW = vpW(); VH = vpH(); _pad = null; lastRW = VW;
+  if (!COARSE) document.documentElement.style.setProperty("--vh", VH + "px");   // Desktop: sichtbare Fensterhöhe; Handy: CSS 100svh
   HERO_H = heroEl.offsetHeight; NAV_H = nav.offsetHeight;
   heroGL.resize(); footGL.resize(); if (POV.gl) POV.gl.resize();
   sizeSlots(); sizeCards(); fitWordmark(); alignLegal(); fitOrbitText(); sizeLeistBody(); fitUeber(); cacheNav(); cacheGeo();
   chips.forEach((c) => (c.last = ""));
 }
-addEventListener("resize", onResize);
+let lastRW = 0;
+// Handy: Ein-/Ausblenden der Browserleiste ändert nur die Höhe → ignorieren (sonst Neuvermessung mitten im Scrollen)
+addEventListener("resize", () => { if (!COARSE || vpW() !== lastRW) onResize(); });
 // Handy: Browserleiste ein-/ausgeblendet → neue sichtbare Höhe übernehmen
-if (window.visualViewport) visualViewport.addEventListener("resize", () => { if (Math.abs(vpH() - VH) > 2) onResize(); });
+if (window.visualViewport && !COARSE) visualViewport.addEventListener("resize", () => { if (Math.abs(vpH() - VH) > 2) onResize(); });
 
 let frameNo = 0;
 const perf = { acc: 0, n: 0, slow: 0, base: 0 };

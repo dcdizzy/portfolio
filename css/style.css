@@ -740,7 +740,7 @@ html.no-scroll { overflow: hidden; }
 @media (max-width: 700px) { .hero__gl { filter: blur(1px); } }
 
 /* Handy: Kartenreihe nur waagerecht nativ wischen – senkrecht übernimmt das eigene Seiten-Scrollen */
-@media (pointer: coarse) { .track-wrap { touch-action: pan-x; } }
+@media (pointer: coarse) { .track-wrap { touch-action: pan-x pan-y; } }
 
 @media (max-width: 900px) and (hover: hover) { .card:hover::before { opacity: 1; } }
 
@@ -862,3 +862,14 @@ body.is-loaded .nav__brand, body.is-loaded .nav__links, body.is-loaded .nav__ico
 /* Kategorie-Pillen auf den Karten = Filterpillen (Schrift und Höhe) */
 .card__tags span { display: inline-flex; align-items: center; height: 33px; padding: 0 1em .1em; font-size: var(--pillfs, 18px); line-height: 1; }
 @media (max-width: 900px) { .card__tags span { height: 27px; } }
+
+/* v104 – Handy: natives Scrollen mit Einrasten */
+@media (pointer: coarse) {
+  html { scroll-snap-type: y mandatory; }
+  html.no-scroll { scroll-snap-type: none; }
+  .hero, #leistungen, #arbeiten, #ueber { scroll-snap-align: start; scroll-snap-stop: always; }   /* höchstens ein Abschnitt pro Wisch; hohe Abschnitte (Über mich) sind innen frei */
+  .footer { scroll-snap-align: end; scroll-snap-stop: always; }
+  /* Footer: feste Höhe mit eingeblendeter Leiste; unten deutlich mehr Animation (hochkant ist Platz) */
+  .footer { min-height: 100svh; padding-bottom: 0; padding-top: max(120px, 26svh); }
+  .footer__strip { height: max(var(--striph, 70px), 20svh); }
+}
